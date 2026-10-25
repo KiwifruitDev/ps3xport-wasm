@@ -16,7 +16,7 @@ export function createRemoteHost(client) {
   const stateOf = fd => {
     let state = states.get(fd);
     if (!state) {
-      state = { readStart: -1, readData: null, writeStart: -1, parts: [], writeLength: 0 };
+      state = { root: null, readStart: -1, readData: null, writeStart: -1, parts: [], writeLength: 0 };
       states.set(fd, state);
     }
     return state;
@@ -31,7 +31,7 @@ export function createRemoteHost(client) {
       while (inner < part.length) {
         const take = Math.min(client.data.length, part.length - inner);
         client.data.set(part.subarray(inner, inner + take), 0);
-        client.call('write', { fd, position: offset, length: take });
+        client.call('write', { root: state.root, fd, position: offset, length: take });
         inner += take;
         offset += take;
       }
@@ -89,19 +89,21 @@ export function createRemoteHost(client) {
     open(root, rel, forWrite) {
       flushAll();
       const { n0, n1 } = client.call('open', { root, rel, forWrite });
-      stateOf(n0);
+      stateOf(n0).root = root;
       return n0;
     },
 
     close(fd) {
+      const state = stateOf(fd);
       flush(fd);
-      client.call('close', { fd });
+      client.call('close', { root: state.root, fd });
       states.delete(fd);
     },
 
     fdSize(fd) {
+      const state = stateOf(fd);
       flush(fd);
-      const { n0 } = client.call('size', { fd });
+      const { n0 } = client.call('size', { root: state.root, fd });
       return n0;
     },
 
@@ -115,7 +117,7 @@ export function createRemoteHost(client) {
       }
 
       const want = Math.max(length, READ_AHEAD);
-      const { n0 } = client.call('read', { fd, position, length: want });
+      const { n0 } = client.call('read', { root: state.root, fd, position, length: want });
       state.readStart = -1;
       state.readData = null;
       if (n0 === 0) return 0;

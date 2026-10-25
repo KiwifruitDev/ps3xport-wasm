@@ -27,6 +27,11 @@ export class DirectoryHost {
 
   setRoot(name, handle) {
     this.roots.set(name, handle);
+    this.invalidate(name);
+  }
+
+  /** Drops cached File objects for a root after it was written to directly. */
+  invalidate(name) {
     for (const key of [...this.files.keys()]) {
       if (key.startsWith(`${name}\u0000`)) this.files.delete(key);
     }

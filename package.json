@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "ps3xport compiled to WebAssembly: browse, extract and build PS3 backups in the browser",
+  "description": "ps3xport compiled to WebAssembly: browse, edit and rebuild PS3 backups in the browser",
   "license": "GPL-3.0-or-later",
   "engines": {
     "node": ">=20"

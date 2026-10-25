@@ -7,11 +7,31 @@
 import { createBridgeServer, DATA_BYTES, HEADER_BYTES } from './sync-bridge.js';
 import { DirectoryHost } from './host-directory.js';
 
+// Routes bridge operations to the host that owns the requested root, so both
+// real folders (DirectoryHost) and in-memory trees (MemoryHost) can be mounted.
+class Router {
+  constructor(primary) {
+    this.primary = primary;
+    this.virtual = new Map();
+  }
+
+  mount(name, host) {
+    this.virtual.set(name, host);
+  }
+
+  async dispatch(op, args, data) {
+    const key = args.root ?? args.rootFrom;
+    if (key && this.virtual.has(key)) return await this.virtual.get(key).dispatch(op, args, data);
+    return await this.primary.dispatch(op, args, data);
+  }
+}
+
 export class Engine {
   constructor({ onProgress } = {}) {
     this.onProgress = onProgress;
     this.host = new DirectoryHost();
     this.host.onProgress = bytes => this.onProgress?.(bytes);
+    this.router = new Router(this.host);
     this.pending = new Map();
     this.nextRequestId = 1;
     this.ready = null;
@@ -34,7 +54,7 @@ export class Engine {
         if (!message || typeof message !== 'object') return;
 
         if (message.type === 'io') {
-          await bridge(message, (request, data) => this.host.dispatch(request.op, request.args, data));
+          await bridge(message, (request, data) => this.router.dispatch(request.op, request.args, data));
           return;
         }
 
@@ -74,7 +94,7 @@ export class Engine {
 
   async setRoot(name, handle) {
     await this.start();
-    const needsWrite = name === 'backup' || name === 'out';
+    const needsWrite = name === 'usb' || name === 'stage' || name === 'out' || name === 'backup';
     if (needsWrite && typeof handle.requestPermission === 'function') {
       const status = await handle.queryPermission({ mode: 'readwrite' });
       if (status !== 'granted') {
@@ -83,8 +103,19 @@ export class Engine {
       }
     }
     this.host.setRoot(name, handle);
+    await this.mount(name);
+  }
+
+  /** Mounts an in-memory host (MemoryHost) under a root name. */
+  async mountMemory(name, host) {
+    await this.start();
+    this.router.mount(name, host);
+    await this.mount(name);
+  }
+
+  mount(name) {
     const id = this.nextRequestId++;
-    await new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
       this.worker.postMessage({ type: 'mount', id, name });
     });

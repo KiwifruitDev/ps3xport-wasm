@@ -1,5 +1,5 @@
-// Browser end-to-end test: drives the real UI in Chrome through the File System
-// Access API (backed by OPFS so it can run unattended).
+// Browser end-to-end test: drives the real file-browser UI in Chrome through
+// the File System Access API (backed by OPFS so it can run unattended).
 //
 //   node test/browser-test.mjs
 //
@@ -7,11 +7,14 @@
 // falling back to "msedge").
 
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { readZip } from '../web/zip.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.join(here, '..');
@@ -41,6 +44,8 @@ function assertEquals(actual, expected, message) {
   if (String(actual) !== String(expected)) throw new Error(`${message}: expected ${expected}, got ${actual}`);
 }
 
+let currentPage = null;
+
 async function test(name, fn) {
   try {
     await fn();
@@ -50,6 +55,11 @@ async function test(name, fn) {
     failures++;
     console.log(`  FAIL ${name}`);
     console.log(`       ${error.message}`);
+    if (currentPage && process.env.PX_VERBOSE) {
+      console.log(`       log: ${await currentPage.textContent('#log').catch(() => '?')}`);
+      console.log(`       toasts: ${JSON.stringify(await currentPage.$$eval('.toast', nodes => nodes.map(node => node.textContent)).catch(() => []))}`);
+      console.log(`       dialogs: ${JSON.stringify(await currentPage.$$eval('dialog', nodes => nodes.map(node => `${node.id}:${node.open}`)).catch(() => []))}`);
+    }
   }
 }
 
@@ -69,6 +79,8 @@ const expectedHashes = Object.fromEntries(Object.entries(fixtures).map(([name, d
   `/${name}`,
   crypto.createHash('sha256').update(data).digest('hex'),
 ]));
+
+const editedNote = 'edited in the browser\nsecond line ✓\n';
 
 function startServer() {
   const child = spawn(process.execPath, [path.join(projectRoot, 'server.mjs'), `--port=${port}`], {
@@ -102,13 +114,77 @@ async function launch() {
   throw new Error('Neither Chrome nor Edge could be launched by Playwright.');
 }
 
+async function menuCommand(page, menu, command) {
+  await page.click(`.menu-button[data-menu="${menu}"]`);
+  await page.click(`.menu-panel[data-panel="${menu}"] [data-cmd="${command}"]`);
+}
+
+async function logHas(page, text, timeout = 60000) {
+  await page.waitForFunction(
+    wanted => [...document.querySelectorAll('#log span')].some(node => node.textContent.includes(wanted)),
+    text,
+    { timeout },
+  );
+}
+
+/** Waits until the log contains at least `times` lines with `text`. */
+async function logHasTimes(page, text, times, timeout = 120000) {
+  await page.waitForFunction(
+    ({ wanted, count }) => [...document.querySelectorAll('#log span')]
+      .filter(node => node.textContent.includes(wanted)).length >= count,
+    { wanted: text, count: times },
+    { timeout },
+  );
+}
+
+async function rows(page) {
+  return await page.$$eval('.explorer-row[data-path]', nodes => nodes.map(node => node.dataset.path));
+}
+
+async function navigateTo(page, target) {
+  await page.click('#path-edit');
+  await page.fill('#path-input', target);
+  await page.press('#path-input', 'Enter');
+  await page.waitForFunction(
+    wanted => [...document.querySelectorAll('.crumb')].some(node => node.textContent.trim() === wanted),
+    target.split('/').filter(Boolean).pop() ?? 'ps3export',
+  );
+}
+
+async function openEditorFor(page, target) {
+  await page.dblclick(`.explorer-row[data-path="${target}"]`);
+  await page.waitForSelector('#editor-dialog[open]');
+}
+
+async function waitForDownload(page) {
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 120000 }),
+    page.click('#download-button'),
+  ]);
+  const target = path.join(os.tmpdir(), `ps3export-test-${Date.now()}.zip`);
+  await download.saveAs(target);
+  return target;
+}
+
+async function zipContents(file) {
+  const buffer = await fs.promises.readFile(file);
+  const archive = await readZip(new Blob([buffer]));
+  const entries = new Map();
+  for (const entry of archive.entries) {
+    if (entry.isDir) continue;
+    entries.set(entry.path, new Uint8Array(await (await entry.getBlob()).arrayBuffer()));
+  }
+  return entries;
+}
+
 async function main() {
   port = await findFreePort();
   baseUrl = `http://localhost:${port}/`;
   const server = await startServer();
   const browser = await launch();
-  const context = await browser.newContext();
+  const context = await browser.newContext({ acceptDownloads: true });
   const page = await context.newPage();
+  currentPage = page;
   const consoleErrors = [];
   page.on('console', message => {
     if (message.type() === 'error') {
@@ -140,6 +216,8 @@ async function main() {
     await test('page is cross-origin isolated and the wasm core boots', async () => {
       assertEquals(await page.evaluate(() => window.crossOriginIsolated), 'true', 'crossOriginIsolated');
       assertEquals(await page.textContent('#app-status'), 'Ready', 'status');
+      assert(await page.isVisible('#empty-state'), 'empty state is visible');
+      assert(await page.isDisabled('#write-button'), 'write is disabled without a backup');
     });
 
     await test('seeds an OPFS content tree', async () => {
@@ -156,29 +234,29 @@ async function main() {
           await writable.close();
         }
         await root.getDirectoryHandle('output', { create: true });
-        await root.getDirectoryHandle('extract', { create: true });
-        await root.getDirectoryHandle('single', { create: true });
       }, { files: Object.fromEntries(Object.entries(fixtures).map(([name, data]) => [`content/${name}`, [...data]])) });
-    });
-
-    await test('creates a backup from the content folder through the UI', async () => {
-      await page.evaluate(async () => {
-        const root = await navigator.storage.getDirectory();
-        window.__pxPickers.push(await root.getDirectoryHandle('content'));
-        window.__pxPickers.push(await root.getDirectoryHandle('output'));
-      });
-      await page.click('#choose-content');
-      await page.waitForFunction(() => document.querySelector('#content-name')?.textContent === 'content');
-      await page.click('#choose-out');
-      await page.waitForFunction(() => document.querySelector('#out-name')?.textContent === 'output');
-      await page.waitForFunction(() => !document.querySelector('#create-backup').disabled);
-      await page.click('#create-backup');
-      await page.waitForFunction(() => [...document.querySelectorAll('#log span')].some(node => node.textContent.includes('Creating backup') && node.textContent.includes('finished')), null, { timeout: 60000 });
     });
 
     let backupName = null;
 
-    await test('opens the created backup and lists its contents', async () => {
+    await test('creates a backup from the folder dialog', async () => {
+      await menuCommand(page, 'file', 'create-backup');
+      await page.waitForSelector('#modal-dialog[open]');
+      await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory();
+        window.__pxPickers.push(await root.getDirectoryHandle('content'));
+      });
+      await page.click('#cb-content');
+      await page.waitForFunction(() => document.querySelector('#cb-content-name')?.textContent === 'content');
+      await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory();
+        window.__pxPickers.push(await root.getDirectoryHandle('output'));
+      });
+      await page.click('#cb-output');
+      await page.waitForFunction(() => document.querySelector('#cb-output-name')?.textContent === 'output');
+      await page.click('#modal-foot button.primary');
+      await logHas(page, 'Created a new backup in');
+
       backupName = await page.evaluate(async () => {
         const root = await navigator.storage.getDirectory();
         const output = await root.getDirectoryHandle('output');
@@ -188,171 +266,288 @@ async function main() {
         return null;
       });
       assert(backupName, 'a backup directory was created');
+    });
 
+    await test('opens the backup folder into the file browser', async () => {
       await page.evaluate(async name => {
         const root = await navigator.storage.getDirectory();
         const output = await root.getDirectoryHandle('output');
         window.__pxPickers.push(await output.getDirectoryHandle(name));
       }, backupName);
-      await page.click('#choose-backup');
-      await page.waitForSelector('#contents-panel:not([hidden])');
-      await page.waitForFunction(() => document.querySelectorAll('#file-list tr[data-path]').length > 0);
+      await page.click('#open-button');
+      await page.waitForFunction(() => document.querySelectorAll('.explorer-row[data-path]').length > 0, null, { timeout: 60000 });
+      await page.waitForSelector('#empty-state', { state: 'hidden' });
 
-      const rows = await page.$$eval('#file-list tr[data-path]', nodes => nodes.map(node => node.dataset.path));
-      for (const wanted of Object.keys(expectedHashes)) assert(rows.includes(wanted), `index lists ${wanted}`);
+      const top = await rows(page);
+      for (const wanted of ['/dev_hdd0', '/dev_flash2']) assert(top.includes(wanted), `index lists ${wanted}`);
 
-      const summary = await page.textContent('#index-summary');
-      assert(summary.includes('Backup ID'), 'index summary shows the backup id');
+      const summary = await page.textContent('#summary');
+      assert(summary.includes('Backup ID'), 'summary shows the backup id');
+      assertEquals(await page.isEnabled('#write-button'), true, 'write is enabled');
+      assertEquals(await page.isEnabled('#download-button'), true, 'download is enabled');
     });
 
-    await test('extracts every file from the browser and verifies hashes', async () => {
+    await test('finds the backup when the parent folder is picked', async () => {
       await page.evaluate(async () => {
         const root = await navigator.storage.getDirectory();
-        window.__pxPickers.push(await root.getDirectoryHandle('extract'));
+        window.__pxPickers.push(await root.getDirectoryHandle('output'));
       });
-      await page.click('#choose-out');
-      await page.waitForFunction(() => document.querySelector('#out-name')?.textContent === 'extract');
-      await page.click('#extract-all');
-      await page.waitForFunction(() => [...document.querySelectorAll('#log span')].some(node => node.textContent.includes('Extraction complete')), null, { timeout: 60000 });
-
-      const hashes = await page.evaluate(async () => {
-        const root = await navigator.storage.getDirectory();
-        const base = await root.getDirectoryHandle('extract');
-        const digest = async (path) => {
-          let dir = base;
-          const segments = path.split('/').filter(Boolean);
-          const file = segments.pop();
-          for (const segment of segments) dir = await dir.getDirectoryHandle(segment);
-          const handle = await dir.getFileHandle(file);
-          const fileData = await handle.getFile();
-          const buffer = await fileData.arrayBuffer();
-          const hash = await crypto.subtle.digest('SHA-256', buffer);
-          return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
-        };
-        const result = {};
-        for (const name of ['dev_hdd0/home/00000001/savedata/GAME1/SAVE.DAT', 'dev_hdd0/game/TEST/USRDIR/EBOOT.BIN', 'dev_flash2/etc/note.txt']) {
-          result['/' + name] = await digest(name);
-        }
-        return result;
-      });
-
-      for (const [name, hash] of Object.entries(expectedHashes)) {
-        assertEquals(hashes[name], hash, `sha256 of ${name}`);
-      }
+      await page.click('#open-button');
+      await logHas(page, 'No archive.dat here; opening the backup in');
+      await page.waitForFunction(() => document.querySelectorAll('.explorer-row[data-path]').length > 0, null, { timeout: 60000 });
+      const top = await rows(page);
+      assert(top.includes('/dev_hdd0'), 'the nested backup folder was opened');
     });
 
-    await test('extracts a single selected file', async () => {
-      const target = '/dev_hdd0/game/TEST/USRDIR/EBOOT.BIN';
-      await page.click(`#file-list tr[data-path="${target}"]`);
-      await page.waitForFunction(() => !document.querySelector('#extract-selected').disabled);
+    await test('navigates with breadcrumbs and the history buttons', async () => {
+      await page.dblclick('.explorer-row[data-path="/dev_hdd0"]');
+      await page.waitForFunction(() => [...document.querySelectorAll('.crumb')].some(node => node.textContent.trim() === 'dev_hdd0'));
+
+      await page.click('#nav-back');
+      await page.waitForFunction(name => [...document.querySelectorAll('.crumb')].some(node => node.textContent.includes(name)), backupName);
+      assert((await rows(page)).includes('/dev_flash2'), 'back returns to the backup root');
+
+      await page.click('#nav-forward');
+      await page.waitForFunction(() => [...document.querySelectorAll('.crumb')].some(node => node.textContent.trim() === 'dev_hdd0'));
+      await page.click('#nav-up');
+      await page.waitForFunction(() => ![...document.querySelectorAll('.crumb')].some(node => node.textContent.trim() === 'dev_hdd0'));
+
+      await navigateTo(page, '/dev_flash2/etc');
+      assert((await rows(page)).includes('/dev_flash2/etc/note.txt'), 'path bar navigates deep');
+      await page.click('#nav-home');
+      await page.waitForFunction(() => [...document.querySelectorAll('.crumb')].length === 1);
+    });
+
+    await test('edits a text file with the built-in editor', async () => {
+      await navigateTo(page, '/dev_flash2/etc');
+      await openEditorFor(page, '/dev_flash2/etc/note.txt');
+      const original = await page.inputValue('#editor-text');
+      assert(original.startsWith('ps3export wasm browser test'), 'editor shows the original text');
+      await page.fill('#editor-text', editedNote);
+      await page.click('#editor-save');
+      await page.waitForSelector('#editor-dialog', { state: 'hidden' });
+      await logHas(page, 'updated in the working copy');
+      await page.waitForFunction(() => [...document.querySelectorAll('.badge.dirty')].length > 0);
+      assert((await page.textContent('#browser-usage')).includes('unsaved change'), 'status reports unsaved changes');
+    });
+
+    await test('creates folders and files in the working copy', async () => {
+      await page.click('#nav-home');
+      await page.waitForFunction(() => [...document.querySelectorAll('.crumb')].length === 1);
+      await menuCommand(page, 'edit', 'new-folder');
+      await page.waitForSelector('#prompt-value');
+      await page.fill('#prompt-value', 'extra');
+      await page.click('#modal-foot button.primary');
+      await page.waitForSelector('.explorer-row[data-path="/extra"]');
+
+      await page.dblclick('.explorer-row[data-path="/extra"]');
+      await page.waitForFunction(() => [...document.querySelectorAll('.crumb')].some(node => node.textContent.trim() === 'extra'));
+
+      await menuCommand(page, 'edit', 'new-file');
+      await page.waitForSelector('#prompt-value');
+      await page.fill('#prompt-value', 'hello.txt');
+      await page.click('#modal-foot button.primary');
+      await page.waitForSelector('#editor-dialog[open]');
+      await page.fill('#editor-text', 'hello world\n');
+      await page.click('#editor-save');
+      await page.waitForSelector('#editor-dialog', { state: 'hidden' });
+      await page.waitForSelector('.explorer-row[data-path="/extra/hello.txt"]');
+    });
+
+    await test('imports a file into the current folder', async () => {
+      const payload = pattern(96 * 1024, 199);
+      await page.setInputFiles('#file-input', {
+        name: 'imported.bin',
+        mimeType: 'application/octet-stream',
+        buffer: payload,
+      });
+      await page.waitForSelector('.explorer-row[data-path="/extra/imported.bin"]');
+      await page.click('.explorer-row[data-path="/extra/imported.bin"]');
+      await page.keyboard.press('Delete');
+      await page.waitForSelector('#modal-dialog[open]');
+      await page.click('#modal-foot button.danger');
+      await page.waitForFunction(() => !document.querySelector('.explorer-row[data-path="/extra/imported.bin"]'));
+
+      const names = await rows(page);
+      assert(names.includes('/extra/hello.txt'), 'the remaining files are untouched');
+    });
+
+    let downloaded = null;
+
+    await test('downloads the working copy as a zip', async () => {
+      downloaded = await waitForDownload(page);
+      const entries = await zipContents(downloaded);
+      const note = Buffer.from(entries.get('dev_flash2/etc/note.txt')).toString('utf8');
+      assertEquals(note, editedNote, 'edited text is in the zip');
+      assertEquals(Buffer.from(entries.get('extra/hello.txt')).toString('utf8'), 'hello world\n', 'new file is in the zip');
+      const eboot = crypto.createHash('sha256').update(entries.get('dev_hdd0/game/TEST/USRDIR/EBOOT.BIN')).digest('hex');
+      assertEquals(eboot, expectedHashes['/dev_hdd0/game/TEST/USRDIR/EBOOT.BIN'], 'binary content is preserved');
+      const save = crypto.createHash('sha256').update(entries.get('dev_hdd0/home/00000001/savedata/GAME1/SAVE.DAT')).digest('hex');
+      assertEquals(save, expectedHashes['/dev_hdd0/home/00000001/savedata/GAME1/SAVE.DAT'], 'second binary content is preserved');
+      assert(!entries.has('extra/imported.bin'), 'deleted file is not in the zip');
+    });
+
+    await test('writes the working copy back to the backup folder', async () => {
+      await page.click('#write-button');
+      await page.waitForSelector('#modal-dialog[open]');
+      await page.click('#modal-foot button.danger');
+      await logHasTimes(page, 'Wrote', 1);
+      await logHasTimes(page, 'Reloading the new backup finished', 1);
+      await page.waitForFunction(() => document.querySelectorAll('.explorer-row[data-path]').length > 0);
+
+      const top = await rows(page);
+      assert(top.includes('/extra'), 'new folder is part of the rebuilt backup');
+
+      const leftovers = await page.evaluate(async name => {
+        const root = await navigator.storage.getDirectory();
+        const output = await root.getDirectoryHandle('output');
+        const backup = await output.getDirectoryHandle(name);
+        const names = [];
+        for await (const [entryName, handle] of backup.entries()) names.push(`${handle.kind}:${entryName}`);
+        return names;
+      }, backupName);
+      assert(leftovers.some(name => name === 'file:archive.dat'), 'archive.dat was rebuilt');
+      assert(!leftovers.some(name => name.startsWith('directory:.ps3export')), 'temporary folders were cleaned up');
+      assert(!leftovers.some(name => name.endsWith('.bak')), 'no .bak files are left behind');
+    });
+
+    await test('the rebuilt archive contains the edited and added files', async () => {
+      await navigateTo(page, '/dev_flash2/etc');
+      await openEditorFor(page, '/dev_flash2/etc/note.txt');
+      assertEquals(await page.inputValue('#editor-text'), editedNote, 'edited text survived the rebuild');
+      await page.click('#editor-cancel');
+      await page.waitForSelector('#editor-dialog', { state: 'hidden' });
+
+      const names = await rows(page);
+      assert(names.includes('/dev_flash2/etc/note.txt'), 'edited file is still listed');
+
+      const rebuilt = await waitForDownload(page);
+      const entries = await zipContents(rebuilt);
+      assertEquals(Buffer.from(entries.get('extra/hello.txt')).toString('utf8'), 'hello world\n', 'added file survived the rebuild');
+      const eboot = crypto.createHash('sha256').update(entries.get('dev_hdd0/game/TEST/USRDIR/EBOOT.BIN')).digest('hex');
+      assertEquals(eboot, expectedHashes['/dev_hdd0/game/TEST/USRDIR/EBOOT.BIN'], 'binary content survived the rebuild');
+    });
+
+    await test('advanced mode is off by default and can be enabled in settings', async () => {
+      await menuCommand(page, 'view', 'settings');
+      await page.waitForSelector('#set-advanced');
+      assert(!(await page.isChecked('#set-advanced')), 'advanced mode defaults to off');
+      assert(await page.isDisabled('#set-device'), 'device id is disabled while advanced mode is off');
+      await page.check('#set-advanced');
+      assert(await page.isEnabled('#set-device'), 'device id becomes editable');
+      await page.click('#modal-foot button.secondary');
+      await page.waitForSelector('#modal-dialog', { state: 'hidden' });
+    });
+
+    await test('replaces the working copy with another folder', async () => {
       await page.evaluate(async () => {
         const root = await navigator.storage.getDirectory();
-        window.__pxPickers.push(await root.getDirectoryHandle('single'));
-      });
-      await page.click('#choose-out');
-      await page.waitForFunction(() => document.querySelector('#out-name')?.textContent === 'single');
-      await page.click('#extract-selected');
-      await page.waitForFunction(() => [...document.querySelectorAll('#log span')].some(node => node.textContent.includes('Extracted to the output folder')), null, { timeout: 60000 });
-
-      const hash = await page.evaluate(async () => {
-        const root = await navigator.storage.getDirectory();
-        let dir = await root.getDirectoryHandle('single');
-        for (const segment of ['dev_hdd0', 'game', 'TEST', 'USRDIR']) dir = await dir.getDirectoryHandle(segment);
-        const handle = await dir.getFileHandle('EBOOT.BIN');
-        const buffer = await (await handle.getFile()).arrayBuffer();
-        const digest = await crypto.subtle.digest('SHA-256', buffer);
-        return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
-      });
-      assertEquals(hash, expectedHashes[target], 'single file hash');
-    });
-
-    await test('appends a content folder to the open backup', async () => {
-      const extra = pattern(220 * 1024, 241);
-      const extraHash = crypto.createHash('sha256').update(extra).digest('hex');
-      await page.evaluate(async values => {
-        const root = await navigator.storage.getDirectory();
-        let dir = await root.getDirectoryHandle('content2', { create: true });
-        for (const segment of ['dev_hdd0', 'extra']) dir = await dir.getDirectoryHandle(segment, { create: true });
-        const handle = await dir.getFileHandle('EXTRA.DAT', { create: true });
+        const dir = await root.getDirectoryHandle('content2', { create: true });
+        const hdd = await dir.getDirectoryHandle('dev_hdd0', { create: true });
+        const handle = await hdd.getFileHandle('replacement.txt', { create: true });
         const writable = await handle.createWritable();
-        await writable.write(new Uint8Array(values));
+        await writable.write(new TextEncoder().encode('replacement content\n'));
         await writable.close();
         window.__pxPickers.push(await root.getDirectoryHandle('content2'));
-      }, [...extra]);
-
-      await page.click('#choose-content');
-      await page.waitForFunction(() => document.querySelector('#content-name')?.textContent === 'content2');
-      await page.waitForFunction(() => !document.querySelector('#add-content').disabled);
-      await page.click('#add-content');
-      await page.waitForFunction(() => [...document.querySelectorAll('#log span')].some(node => node.textContent.includes('Content added')), null, { timeout: 120000 });
-      await page.waitForSelector('#file-list tr[data-path="/dev_hdd0/extra/EXTRA.DAT"]');
-
-      // The appended segment must be readable end to end.
-      await page.click('#file-list tr[data-path="/dev_hdd0/extra/EXTRA.DAT"]');
-      await page.evaluate(async () => {
-        const root = await navigator.storage.getDirectory();
-        window.__pxPickers.push(await root.getDirectoryHandle('extra-out', { create: true }));
       });
-      await page.click('#choose-out');
-      await page.waitForFunction(() => document.querySelector('#out-name')?.textContent === 'extra-out');
-      await page.click('#extract-selected');
-      await page.waitForFunction(() => [...document.querySelectorAll('#log span')].filter(node => node.textContent.includes('Extracted to the output folder')).length >= 2, null, { timeout: 60000 });
 
-      const hash = await page.evaluate(async () => {
-        const root = await navigator.storage.getDirectory();
-        let dir = await root.getDirectoryHandle('extra-out');
-        for (const segment of ['dev_hdd0', 'extra']) dir = await dir.getDirectoryHandle(segment);
-        const buffer = await (await (await dir.getFileHandle('EXTRA.DAT')).getFile()).arrayBuffer();
-        const digest = await crypto.subtle.digest('SHA-256', buffer);
-        return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
-      });
-      assertEquals(hash, extraHash, 'appended file hash');
+      await menuCommand(page, 'file', 'replace-folder');
+      await page.waitForFunction(() => document.querySelector('#summary')?.textContent.includes('Content tree'), null, { timeout: 60000 });
+      const list = await rows(page);
+      assert(list.includes('/dev_hdd0'), 'replacement folder is browsable');
+      await page.dblclick('.explorer-row[data-path="/dev_hdd0"]');
+      await page.waitForSelector('.explorer-row[data-path="/dev_hdd0/replacement.txt"]');
+      await page.click('#nav-home');
+      await page.waitForFunction(() => [...document.querySelectorAll('.crumb')].length === 1);
     });
 
-    await test('deletes a file from the index (rewrites archive.dat in place)', async () => {
-      const before = await page.$$eval('#file-list tr[data-path]', nodes => nodes.length);
-      await page.click('#file-list tr[data-path="/dev_hdd0/extra/EXTRA.DAT"]');
-      await page.waitForFunction(() => document.querySelector('#file-list tr[data-path="/dev_hdd0/extra/EXTRA.DAT"]').classList.contains('selected'));
-      await page.click('#delete-selected');
-      await page.waitForFunction(() => [...document.querySelectorAll('#log span')].some(node => node.textContent.includes('from the index') && node.textContent.includes('finished')), null, { timeout: 60000 });
+    await test('opening a zip file works end to end', async () => {
+      await page.setInputFiles('#zip-input', downloaded);
+      await page.waitForFunction(() => document.querySelector('#summary')?.textContent.includes('Zip ·'), null, { timeout: 60000 });
+      await page.waitForFunction(() => document.querySelectorAll('.explorer-row[data-path]').length > 0, null, { timeout: 60000 });
+      const top = await rows(page);
+      assert(top.includes('/dev_hdd0'), 'zip contents are browsable');
+      await navigateTo(page, '/dev_flash2/etc');
+      await openEditorFor(page, '/dev_flash2/etc/note.txt');
+      assertEquals(await page.inputValue('#editor-text'), editedNote, 'zip file content is readable');
+      await page.click('#editor-cancel');
+    });
 
-      const paths = await page.$$eval('#file-list tr[data-path]', nodes => nodes.map(node => node.dataset.path));
-      assertEquals(paths.length, before, 'entry count unchanged');
-      assert(paths.includes('/dev_hdd0/tmp/null'), 'entry redirected to /dev_hdd0/tmp/null');
-      assert(!paths.includes('/dev_hdd0/extra/EXTRA.DAT'), 'file no longer listed');
-
-      // The index must still be valid after the in-place rewrite.
-      await page.evaluate(async name => {
+    assert(consoleErrors.length === 0, `no console errors: ${consoleErrors.join(' | ')}`);
+    await test('writes a backup that came from a zip file', async () => {
+      const zipPath = path.join(os.tmpdir(), `ps3export-backup-${Date.now()}.zip`);
+      const base64 = await page.evaluate(async name => {
+        const { buildZip } = await import('./zip.js');
         const root = await navigator.storage.getDirectory();
         const output = await root.getDirectoryHandle('output');
-        window.__pxPickers.push(await output.getDirectoryHandle(name));
+        const backup = await output.getDirectoryHandle(name);
+        const entries = [];
+        async function walk(dir, prefix) {
+          for await (const [entryName, handle] of dir.entries()) {
+            const entryPath = `${prefix}/${entryName}`;
+            if (handle.kind === 'directory') {
+              await walk(handle, entryPath);
+            } else {
+              const file = await handle.getFile();
+              entries.push({ path: entryPath, mtime: new Date(file.lastModified), getBlob: async () => file });
+            }
+          }
+        }
+        await walk(backup, '');
+        const { blob } = await buildZip(entries, {});
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let binary = '';
+        for (let offset = 0; offset < bytes.length; offset += 8192) {
+          binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+        }
+        return btoa(binary);
       }, backupName);
-      await page.click('#choose-backup');
-      await page.waitForFunction(() => [...document.querySelectorAll('#log span')].filter(node => node.textContent.includes('archive.dat:')).length >= 2);
-    });
+      await fs.promises.writeFile(zipPath, Buffer.from(base64, 'base64'));
 
-    await test('filters the file list', async () => {
-      const total = await page.$$eval('#file-list tr[data-path]', nodes => nodes.length);
-      await page.fill('#filter', 'EBOOT');
-      await page.waitForFunction(() => document.querySelectorAll('#file-list tr[data-path]').length === 1);
-      await page.fill('#filter', '');
-      await page.waitForFunction(count => document.querySelectorAll('#file-list tr[data-path]').length === count, total);
-    });
+      await page.setInputFiles('#zip-input', zipPath);
+      await page.waitForFunction(
+        () => [...document.querySelectorAll('.explorer-row[data-path]')].some(node => node.dataset.path === '/dev_hdd0'),
+        null,
+        { timeout: 120000 },
+      );
+      const top = await rows(page);
+      assert(top.includes('/dev_hdd0'), 'the zipped backup is browsable');
 
-    await test('produced no console errors', async () => {
-      const relevant = consoleErrors.filter(message => !message.includes('favicon'));
-      assertEquals(relevant.length, 0, `console errors: ${relevant.join(' | ')}`);
+      await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory();
+        await root.getDirectoryHandle('device', { create: true });
+        window.__pxPickers.push(await root.getDirectoryHandle('device'));
+      });
+      await page.click('#write-button');
+      await page.waitForSelector('#modal-dialog[open]');
+      await page.click('#modal-foot button.danger');
+      await logHasTimes(page, 'Wrote', 2);
+      await logHasTimes(page, 'Reloading the new backup finished', 2);
+
+      const written = await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory();
+        const device = await root.getDirectoryHandle('device');
+        const names = [];
+        for await (const [name, handle] of device.entries()) names.push(`${handle.kind}:${name}`);
+        return names;
+      });
+      assert(written.includes('file:archive.dat'), 'the archive was rebuilt from the zip');
+      assert(!written.some(name => name.startsWith('directory:.ps3export')), 'temporary folders were cleaned up');
     });
   } finally {
-    console.log('--- app activity log ---');
-    console.log((await page.textContent('#log').catch(() => ''))?.trim());
-    console.log(`--- status: ${await page.textContent('#app-status').catch(() => '?')}`);
+    if (process.env.PXFS_DEBUG) {
+      console.log((await page.textContent('#log').catch(() => ''))?.trim());
+      console.log(`--- status: ${await page.textContent('#app-status').catch(() => '?')}`);
+    }
     await browser.close();
     server.kill();
   }
 
-  console.log(`\n${passes} passed, ${failures} failed`);
-  process.exit(failures === 0 ? 0 : 1);
+  if (failures > 0) {
+    console.log(`\n${failures} test(s) failed, ${passes} passed.`);
+    process.exit(1);
+  }
+  console.log(`\nAll ${passes} browser tests passed.`);
 }
 
 main().catch(error => {
