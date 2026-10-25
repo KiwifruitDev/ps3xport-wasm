@@ -1,0 +1,16 @@
+# Build output and local caches
+/build/
+/.cache/
+/node_modules/
+*.log
+
+# Test scratch directories
+/test/.tmp/
+/test/.tmp-bridge/
+/test/.tmp-debug/
+
+# Local source checkout; keep the original sibling checkout out of this repo
+/vendor/ps3xport/
+
+.DS_Store
+Thumbs.db

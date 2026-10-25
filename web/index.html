@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#12141a">
+  <title>ps3export — PS3 backup tool</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">WEBASSEMBLY · RUNS LOCALLY</p>
+      <h1>ps3export</h1>
+      <p class="subtitle">Browse, extract and build PS3 backup archives in your browser. Files never leave your machine.</p>
+    </div>
+    <span class="status" id="app-status">Starting…</span>
+  </header>
+
+  <main>
+    <section class="notice error" id="unsupported" hidden></section>
+
+    <section class="panel">
+      <div class="section-heading">
+        <h2><span class="step">1</span> Backup folder</h2>
+      </div>
+      <p class="muted">Pick the folder that contains <code>archive.dat</code>, for example <code>PS3\EXPORT\202610241324</code>. The bundled <code>keys.conf</code> is built in — you do not need to provide keys, and normal content needs no console-specific keys.</p>
+      <div class="row">
+        <button id="choose-backup" type="button">Choose backup folder</button>
+        <span class="muted" id="backup-name">No folder selected</span>
+      </div>
+      <div class="summary" id="backup-summary" hidden></div>
+    </section>
+
+    <section class="panel" id="contents-panel" hidden>
+      <div class="section-heading">
+        <div>
+          <h2><span class="step">2</span> Contents</h2>
+          <p class="muted">Files listed in the backup index. Select one to extract it on its own.</p>
+        </div>
+        <div class="row">
+          <select id="index-select" aria-label="Index file"></select>
+          <input id="filter" type="search" placeholder="Filter paths…" aria-label="Filter paths">
+        </div>
+      </div>
+      <div class="summary" id="index-summary"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Path</th><th class="num">Size</th><th class="num">Mode</th></tr></thead>
+          <tbody id="file-list"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" id="extract-panel">
+      <h2><span class="step">3</span> Output folder</h2>
+      <p class="muted">Extracted files and newly built backups are written here. The PS3 paths are recreated inside it.</p>
+      <div class="row">
+        <button id="choose-out" type="button" class="secondary">Choose output folder</button>
+        <span class="muted" id="out-name">No folder selected</span>
+      </div>
+      <div class="row">
+        <button id="extract-all" type="button" disabled>Extract everything</button>
+        <button id="extract-selected" type="button" disabled>Extract selected file</button>
+      </div>
+    </section>
+
+    <section class="panel" id="build-panel">
+      <h2><span class="step">4</span> Build</h2>
+      <p class="muted">Building a normal (unprotected) backup only needs the built-in keys. The content folder mirrors the PS3 filesystem: it must contain <code>dev_hdd0</code>, <code>dev_flash2</code>, and so on.</p>
+      <div class="row">
+        <button id="choose-content" type="button" class="secondary">Choose content folder</button>
+        <span class="muted" id="content-name">No folder selected</span>
+      </div>
+      <div class="row">
+        <button id="create-backup" type="button" disabled>Create new backup</button>
+        <span class="muted" id="create-hint">Needs an output folder and a content folder.</span>
+      </div>
+      <div class="row">
+        <button id="add-content" type="button" class="secondary" disabled>Add folder to selected backup</button>
+      </div>
+      <div class="row">
+        <button id="delete-selected" type="button" class="secondary" disabled>Delete selected file from index</button>
+        <button id="delete-protected" type="button" class="secondary" disabled>Drop copy-protected reference</button>
+      </div>
+    </section>
+
+    <details class="panel" id="advanced-panel">
+      <summary>Advanced: console keys (optional)</summary>
+      <p class="muted">Only needed to read or write the copy-protected <code>archive2</code> set. Leave empty for normal backups.</p>
+      <div class="field">
+        <label for="device-id">Device ID / IDP (32 hex chars)</label>
+        <input id="device-id" type="text" spellcheck="false" placeholder="00000000000000000000000000000000">
+      </div>
+      <div class="field">
+        <label for="open-psid">OpenPSID (32 hex chars, used for new backups)</label>
+        <input id="open-psid" type="text" spellcheck="false" placeholder="all zeroes">
+      </div>
+      <div class="row"><button id="apply-ids" type="button" class="secondary">Apply</button></div>
+    </details>
+
+    <section class="panel">
+      <div class="section-heading">
+        <h2>Activity</h2>
+        <button id="clear-log" type="button" class="link">Clear</button>
+      </div>
+      <div class="progress" id="progress-wrap" hidden>
+        <div class="bar"><div class="fill" id="progress-fill"></div></div>
+        <span class="muted" id="progress-label"></span>
+      </div>
+      <pre class="log" id="log"></pre>
+    </section>
+  </main>
+
+  <footer>
+    <p>Built on <a href="https://github.com/kakaroto/ps3xport" rel="noreferrer">ps3xport</a> (GPLv3), compiled to WebAssembly. All file access is initiated by you; nothing is uploaded.</p>
+  </footer>
+</body>
+</html>

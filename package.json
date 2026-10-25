@@ -1,0 +1,24 @@
+{
+  "name": "ps3export-wasm",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ps3xport compiled to WebAssembly: browse, extract and build PS3 backups in the browser",
+  "license": "GPL-3.0-or-later",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build-wasm.mjs",
+    "build:debug": "node scripts/build-wasm.mjs --debug",
+    "start": "node server.mjs --open",
+    "serve": "node server.mjs",
+    "test": "node test/run-tests.mjs",
+    "test:bridge": "node test/bridge-tests.mjs",
+    "test:browser": "node test/browser-test.mjs",
+    "test:all": "node test/run-tests.mjs && node test/bridge-tests.mjs && node test/browser-test.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.56.1"
+  }
+}
