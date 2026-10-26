@@ -4,8 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#12141a">
+  <meta name="description" content="Browse, edit and rebuild PS3 Backup Utility archives locally. Incremental writes, chunk-aware storage, no uploads.">
+  <meta name="color-scheme" content="dark">
+  <link rel="canonical" href="https://kiwifruitdev.com/tools/ps3export">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ps3export">
   <title>ps3export — PS3 backup editor</title>
-  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.js"></script>
 </head>
@@ -63,7 +70,11 @@
           <button type="button" data-cmd="import-folder"><svg><use href="#i-open"/></svg><span>Import folder…</span></button>
           <div class="menu-rule"></div>
           <button type="button" data-cmd="rename"><svg><use href="#i-pencil"/></svg><span>Rename…</span><kbd>F2</kbd></button>
-          <button type="button" data-cmd="delete"><svg><use href="#i-trash"/></svg><span>Delete</span><kbd>Del</kbd></button>
+          <button type="button" data-cmd="properties"><svg><use href="#i-info"/></svg><span>Properties…</span><kbd>F4</kbd></button>
+          <div class="menu-rule"></div>
+          <button type="button" data-cmd="delete"><svg><use href="#i-trash"/></svg><span>Delete…</span><kbd>Del</kbd></button>
+          <button type="button" data-cmd="delete-unlink"><svg><use href="#i-trash"/></svg><span>Unlink (keep bytes)</span></button>
+          <button type="button" data-cmd="delete-erase"><svg><use href="#i-trash"/></svg><span>Erase (rewrite chunks)</span></button>
         </div>
       </div>
       <div class="menu-group">
@@ -71,7 +82,9 @@
         <div class="menu-panel" data-panel="view" hidden>
           <button type="button" data-cmd="refresh"><svg><use href="#i-reload"/></svg><span>Reload from folder</span><kbd>F5</kbd></button>
           <button type="button" data-cmd="show-details"><svg><use href="#i-info"/></svg><span>Backup details</span></button>
+          <button type="button" data-cmd="compact"><svg><use href="#i-trash"/></svg><span>Compact unlinked data…</span></button>
           <div class="menu-rule"></div>
+          <button type="button" data-cmd="install"><svg><use href="#i-download"/></svg><span>Install app</span></button>
           <button type="button" data-cmd="settings"><svg><use href="#i-settings"/></svg><span>Settings…</span></button>
         </div>
       </div>
@@ -200,10 +213,23 @@
           <h2 id="progress-title">Working…</h2>
           <p class="dialog-sub" id="progress-step"></p>
         </div>
+        <span class="pill" id="progress-percent">0%</span>
       </header>
-      <div class="bar"><div class="fill" id="progress-fill"></div></div>
-      <div class="dialog-foot">
+      <div class="progress-body">
+        <div class="progress-row">
+          <span class="progress-label">Overall</span>
+          <div class="bar"><div class="fill" id="progress-fill"></div></div>
+          <span class="progress-value" id="progress-overall"></span>
+        </div>
+        <div class="progress-row" id="progress-chunk-row" hidden>
+          <span class="progress-label" id="progress-chunk-label">Chunk</span>
+          <div class="bar chunk"><div class="fill" id="progress-chunk-fill"></div></div>
+          <span class="progress-value" id="progress-chunk-value"></span>
+        </div>
+      </div>
+      <div class="dialog-foot progress-foot">
         <span class="muted" id="progress-detail"></span>
+        <span class="muted progress-timing" id="progress-timing"></span>
         <span class="spacer"></span>
         <button type="button" class="secondary" id="progress-cancel" hidden>Cancel</button>
       </div>

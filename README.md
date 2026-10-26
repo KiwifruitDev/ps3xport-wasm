@@ -13,16 +13,29 @@ there is no backend, only a static file server.
 - **Create, import and edit files** — including a built-in text editor for
   files up to 8 MiB.
 - **Create folders, rename and delete** anything in the working copy.
+- **Multi-selection** with `Ctrl`+click, `Shift`+click, `Ctrl+A`, plus a
+  properties dialog that shows sizes, modes, dates, the chunks a file lives in
+  and, for new files, where they will be stored.
 - **Download the whole working copy as a zip** (zip64, streamed).
-- **Write the working copy back to the device**: the archive is rebuilt from
-  scratch first, then `archive*.dat` on the USB folder is replaced.
+- **Write incrementally**: renames only rewrite `archive.dat`, new files append
+  to the last chunk (or start a new one) and only a delete or a size change
+  rewrites the chunks after the affected file. Nothing is extracted.
+- **Two delete modes**: *Unlink* drops only the index entry (instant, keeps the
+  bytes) and *Erase* reclaims the space by rewriting the affected chunks.
+  *Compact unlinked data* reclaims space later.
+- **Hold Shift** while starting Write, Delete or Compact to skip its
+  confirmation dialog.
+- **Separate overall and per-chunk progress** with elapsed time, live speed and
+  an ETA, plus a plan dialog that lists the chunks and files that will change.
 - **Replace the working copy** with the contents of another zip or folder.
 - **Create a brand new backup** from a content folder that mirrors the PS3
   filesystem.
+- **Install as an app / work offline**: a service worker caches the page, so it
+  keeps working without a network connection after the first visit.
 - **Menu bar + toolbar**: daily actions stay on the toolbar (open, navigation,
   path, write), everything else lives in the File / Edit / View menus.
 - **Modal dialogs, toasts and progress** for every long operation, with cancel
-  support for zips.
+  support for zips and chunk generation.
 
 `keys.conf` is compiled into the wasm binary, so **you never provide keys**.
 Normal backups need no console-specific keys: `archive.dat` and
@@ -76,24 +89,45 @@ instead of the UI.
    folder*. Imported files are kept in memory until you write.
 5. **Download** the working copy as a zip from the toolbar button or
    *File → Download as zip*.
-6. **Write** (`Ctrl+S` outside the editor) to rebuild the archive and replace
-   `archive*.dat` in the folder you opened (or a folder you pick).
+6. **Write** (`Ctrl+S` outside the editor) to update the archive in the folder
+   you opened (or a folder you pick). The plan dialog shows which chunks and
+   files change, with an estimated duration.
 
 ### Working copy semantics
 
 Opening a backup reads only the index into memory; file contents stay in the
 original archive and are streamed when you open, zip or write them. Edits,
-imports and new files live in memory as Blobs until you write. *Write* therefore
-performs a full rebuild:
+imports and new files live in memory as Blobs until you write.
 
-1. extract the current archive into a hidden staging folder next to it,
-2. apply your edits, imports and deletions,
-3. build a new archive into a hidden output folder,
-4. only then delete the old `archive*.dat` and move the new files into place,
-5. clean up and reload.
+A PS3 data archive has no per-file offsets: the position of every file is
+implied by the order and sizes of the entries before it, and each chunk is a
+separately encrypted/HMAC'd file. That makes some updates cheap and others
+expensive:
 
-The device is never left with a half-written index: if the build fails, the old
-files are untouched.
+| Change | What is rewritten |
+| --- | --- |
+| Rename | `archive.dat` only |
+| Unlink (delete, keep bytes) | `archive.dat` only, with a hidden tombstone entry |
+| Add files | the last chunk, or a brand new chunk when it is exactly full |
+| Replace a file, same size | only the chunk(s) holding that file |
+| Erase / resize / compact | every chunk from the affected file to the end |
+
+Unchanged files never pass through JavaScript: the core splices their bytes
+straight from the old chunk into the new one. New or edited content is streamed
+from its Blob in 4 MiB slices. Nothing is extracted.
+
+Chunks that do not exist yet are written straight to their final name, so the
+common append case needs no temporary space at all. Only chunks that replace an
+existing file are produced in a hidden `.ps3export-out-*` folder first; it is
+removed after the commit.
+
+Every chunk except the last one is exactly `0xFFFFFE00` bytes (4 GiB − 512); a
+chunk that becomes empty is removed. Files larger than the free space of a chunk
+span a chunk boundary, which the file properties dialog shows explicitly.
+
+If the write fails before the commit phase, the temporary folder is removed and
+the device is untouched. A marker file is only left behind when the failure
+happens while replacing the archive, so an interrupted commit can be spotted.
 
 ### Content folder layout
 
@@ -123,20 +157,31 @@ The page never holds a whole backup in RAM:
   and never from one giant `ArrayBuffer`.
 - Zip input is decompressed per entry on demand.
 
-Writing a very large backup still requires temporary disk space for the staging
-folder plus the rebuilt archive, because the core rebuilds the whole archive.
+Incremental writes never extract the archive, so they need no staging copy of
+the current contents. The temporary folder only holds the chunks being
+produced, and the peak extra space on the device is the size of the rewritten
+tail (one chunk for an append, more when erasing early data).
+
+## Offline use and installation
+
+The page is a static site with no backend. `sw.js` caches the HTML, scripts and
+the WebAssembly binary, so after the first visit it works offline and browsers
+can install it as an app (*View → Install app*, or the address bar's install
+button). The canonical address is
+<https://kiwifruitdev.com/tools/ps3export>; the same files also run from any
+static host that sends the COOP/COEP headers used by `server.mjs`.
 
 ## Safety notes
 
 - Writes always go through the browser's `FileSystemWritableFileStream`, never
   through a native path.
-- Rebuilding replaces `archive.dat`, `archive2.dat` and their `archive_*.dat`
-  segments of the folder you write to. Keep a second copy of anything you
-  cannot afford to lose.
-- Deleted or renamed paths are pruned from the staging folder during a write;
-  nothing is deleted on the device until the new archive is complete.
+- A write only touches `archive.dat` / `archive2.dat` and the `archive_*.dat`
+  chunks that actually change. Keep a second copy of anything you cannot afford
+  to lose.
+- New chunks are produced in a hidden folder first; the old chunks and index are
+  replaced only when every new chunk has been written successfully.
 - Copy-protected content is only included when advanced mode is on and a Device
-  ID is configured.
+  ID is configured. If it is off, `archive2*.dat` is left completely untouched.
 
 ## Project layout
 
@@ -146,6 +191,8 @@ src/core/       upstream ps3xport C sources (aes, sha1, tools, keys, paged_file,
 src/wasm/       api.c (flat C API for JavaScript) + px_platform.h
 web/            static app: UI, worker, filesystem driver, wasm output
   app.js          panel controller: browsing, editing, writing, commands
+  layout.js       chunk layout + incremental write planner
+  writer.js       executes a plan through the wasm chunk writer
   ui.js           menus, dialogs, toasts, progress, context menus
   vfs.js          in-memory working copy + PXFS host adapter
   zip.js          streaming zip writer (zip64) and reader
@@ -154,6 +201,7 @@ web/            static app: UI, worker, filesystem driver, wasm output
   pxfs.js         Emscripten filesystem driver
   host-directory.js  main-thread host backed by File System Access handles
   host-remote.js  worker-side synchronous host over SharedArrayBuffer
+  manifest.webmanifest, sw.js, icons/   installable/offline app
 scripts/        build-wasm.mjs (Emscripten build)
 test/           Node + Chrome end-to-end tests
 server.mjs      static server with COOP/COEP headers
@@ -174,10 +222,15 @@ binary.
 ## Tests
 
 ```powershell
-npm test               # core: create/extract/add/delete/verify in Node
-npm run test:bridge    # the browser path: worker + SharedArrayBuffer bridge
-npm run test:browser   # real Chrome: drives the UI against OPFS
+npm test                # core: create/extract/add/delete/verify in Node
+npm run test:bridge     # the browser path: worker + SharedArrayBuffer bridge
+npm run test:incremental  # layout mapping + incremental chunk/index writes
+npm run test:browser    # real Chrome: drives the UI against OPFS
 ```
+
+`test:incremental` builds an archive with small chunks (4 KiB) so it can verify
+multi-chunk files, append, rename, in-place replacement, erase, unlink,
+compaction and the chunk-size invariant without gigabytes of data.
 
 `test:browser` needs Chrome or Edge. It starts the local server on a free port,
 seeds an OPFS content tree, creates a backup through the UI, then exercises

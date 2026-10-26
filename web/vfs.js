@@ -318,7 +318,12 @@ export class MemoryHost {
       case 'stat': {
         const node = args.rel === '' ? this.vfs.root : this.vfs.get(args.rel);
         if (!node) return { n0: 0 };
-        return { n0: 1, n1: node.type === 'file' ? node.size : 0, n2: node.type === 'dir' ? 1 : 0 };
+        const size = node.type === 'file' ? node.size : 0;
+        return {
+          n0: 1 | (node.type === 'dir' ? 2 : 0),
+          n1: size >>> 0,
+          n2: Math.floor(size / 0x100000000),
+        };
       }
       case 'readdir': {
         const node = this.vfs.get(args.rel);
@@ -424,8 +429,9 @@ export class MemoryHost {
       }
       case 'size': {
         const entry = this.open.get(args.fd);
-        if (!entry) return { n0: 0 };
-        return { n0: entry.kind === 'write' ? entry.writable.size : entry.size };
+        if (!entry) return { n0: 0, n1: 0 };
+        const size = entry.kind === 'write' ? entry.writable.size : entry.size;
+        return { n0: size >>> 0, n1: Math.floor(size / 0x100000000) };
       }
       default:
         throw new Error(`unknown filesystem operation "${op}"`);

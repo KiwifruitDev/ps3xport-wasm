@@ -15,8 +15,9 @@
     "serve": "node server.mjs",
     "test": "node test/run-tests.mjs",
     "test:bridge": "node test/bridge-tests.mjs",
+    "test:incremental": "node test/incremental-tests.mjs",
     "test:browser": "node test/browser-test.mjs",
-    "test:all": "node test/run-tests.mjs && node test/bridge-tests.mjs && node test/browser-test.mjs"
+    "test:all": "node test/run-tests.mjs && node test/bridge-tests.mjs && node test/incremental-tests.mjs && node test/browser-test.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.56.1"

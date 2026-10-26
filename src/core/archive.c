@@ -90,7 +90,7 @@ using the device ID (IDP) or the key seed in the archive header
 
 */
 
-static int
+int
 archive_gen_keys (DatFileHeader *header, u8 *key, u8 *iv, u8 *hmac)
 {
   u8 buffer[0x40];
@@ -1308,4 +1308,10 @@ archive_set_open_psid (const u8 psid[0x10])
 {
   memcpy (open_psid, psid, 0x10);
   open_psid_set = TRUE;
+}
+
+void
+archive_get_open_psid (u8 psid[0x10])
+{
+  memcpy (psid, open_psid, 0x10);
 }

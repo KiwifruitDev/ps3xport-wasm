@@ -391,6 +391,22 @@ px_index_dir_path (int i)
   return dir == NULL ? "" : dir->path;
 }
 
+EMSCRIPTEN_KEEPALIVE double
+px_index_dir_mtime (int i)
+{
+  ArchiveDirectory *dir = px_index_nth_dir (i);
+
+  return dir == NULL ? 0 : (double) dir->fsstat.mtime;
+}
+
+EMSCRIPTEN_KEEPALIVE double
+px_index_dir_flags (int i)
+{
+  ArchiveDirectory *dir = px_index_nth_dir (i);
+
+  return dir == NULL ? 0 : (double) dir->flags;
+}
+
 EMSCRIPTEN_KEEPALIVE unsigned
 px_index_dir_mode (int i)
 {
@@ -441,6 +457,306 @@ px_index_psid (void)
 {
   px_bytes_to_hex (px_index.footer.psid, 0x10, px_string);
   return px_string;
+}
+
+/* ------------------------------------------------------------------ */
+/* Index editing (used by the incremental writer)                     */
+/* ------------------------------------------------------------------ */
+
+/*
+  These calls operate on the index opened with px_index_open(). They let the
+  JavaScript side describe the new file table without rebuilding the archive:
+  the data layout of an archive is implied by the order and sizes of its index
+  entries, so adding, removing or renaming entries is all that a cheap update
+  needs.
+*/
+
+static ArchiveFile *
+px_index_lookup (const char *path, ChainedList **prev)
+{
+  ChainedList *current = px_index.files;
+  ChainedList *last = NULL;
+
+  while (current != NULL) {
+    ArchiveFile *file = current->data;
+
+    if (strcmp (file->path, path) == 0) {
+      if (prev != NULL)
+        *prev = last;
+      return file;
+    }
+    last = current;
+    current = current->next;
+  }
+  return NULL;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_index_has_file (const char *path)
+{
+  return px_index_open_flag && px_index_lookup (path, NULL) != NULL;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_index_remove_file (const char *path)
+{
+  ChainedList *prev = NULL;
+  ChainedList *current;
+  ArchiveFile *file;
+
+  PX_BEGIN ();
+
+  if (!px_index_open_flag) {
+    px_set_error ("No index is open\n");
+    px_active = 0;
+    return -1;
+  }
+
+  file = px_index_lookup (path, &prev);
+  if (file == NULL) {
+    px_set_error ("%s is not part of this index\n", path);
+    px_active = 0;
+    return -1;
+  }
+  if (prev == NULL)
+    current = px_index.files;
+  else
+    current = prev->next;
+
+  if (prev == NULL)
+    px_index.files = current->next;
+  else
+    prev->next = current->next;
+  free (current->data);
+  free (current);
+
+  PX_END ();
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_index_rename_file (const char *from, const char *to)
+{
+  ArchiveFile *file;
+
+  PX_BEGIN ();
+
+  if (!px_index_open_flag) {
+    px_set_error ("No index is open\n");
+    px_active = 0;
+    return -1;
+  }
+  if (strlen (to) >= sizeof (file->path)) {
+    px_set_error ("The new path is too long for the archive format\n");
+    px_active = 0;
+    return -1;
+  }
+  file = px_index_lookup (from, NULL);
+  if (file == NULL) {
+    px_set_error ("%s is not part of this index\n", from);
+    px_active = 0;
+    return -1;
+  }
+  memset (file->path, 0, sizeof (file->path));
+  strcpy (file->path, to);
+
+  PX_END ();
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_index_update_file (const char *path, double size, unsigned mode,
+    double mtime, unsigned flags)
+{
+  ArchiveFile *file;
+
+  PX_BEGIN ();
+
+  if (!px_index_open_flag) {
+    px_set_error ("No index is open\n");
+    px_active = 0;
+    return -1;
+  }
+  file = px_index_lookup (path, NULL);
+  if (file == NULL) {
+    px_set_error ("%s is not part of this index\n", path);
+    px_active = 0;
+    return -1;
+  }
+  file->fsstat.mode = mode;
+  file->fsstat.mtime = (u64) mtime;
+  file->fsstat.file_size = (u64) size;
+  file->flags = flags;
+
+  PX_END ();
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_index_add_file (const char *path, double size, unsigned mode,
+    double mtime, unsigned flags)
+{
+  ArchiveFile *file;
+
+  PX_BEGIN ();
+
+  if (!px_index_open_flag) {
+    px_set_error ("No index is open\n");
+    px_active = 0;
+    return -1;
+  }
+  if (strlen (path) >= sizeof (file->path)) {
+    px_set_error ("The path is too long for the archive format\n");
+    px_active = 0;
+    return -1;
+  }
+  if (px_index_lookup (path, NULL) != NULL) {
+    px_set_error ("%s is already part of this index\n", path);
+    px_active = 0;
+    return -1;
+  }
+
+  file = calloc (1, sizeof (ArchiveFile));
+  if (file == NULL) {
+    px_set_error ("Out of memory\n");
+    px_active = 0;
+    return -1;
+  }
+  strcpy (file->path, path);
+  file->fsstat.mode = mode;
+  file->fsstat.uid = 0;
+  file->fsstat.gid = (strncmp (path, "/dev_flash2", 11) == 0) ? 0 : -1;
+  file->fsstat.atime = (u64) mtime;
+  file->fsstat.mtime = (u64) mtime;
+  file->fsstat.ctime = (u64) mtime;
+  file->fsstat.file_size = (u64) size;
+  file->fsstat.block_size = 0x200;
+  file->flags = flags;
+
+  px_index.files = chained_list_append (px_index.files, file);
+
+  PX_END ();
+}
+
+static void
+px_free_dir_cb (void *data, void *ignore)
+{
+  (void) ignore;
+  free (data);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_index_clear_dirs (void)
+{
+  PX_BEGIN ();
+
+  if (!px_index_open_flag) {
+    px_set_error ("No index is open\n");
+    px_active = 0;
+    return -1;
+  }
+  chained_list_foreach (px_index.dirs, px_free_dir_cb, NULL);
+  chained_list_free (px_index.dirs);
+  px_index.dirs = NULL;
+  px_index.total_dirs = 0;
+
+  PX_END ();
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_index_add_dir (const char *path, unsigned mode, double mtime, unsigned flags)
+{
+  ArchiveDirectory *dir;
+
+  PX_BEGIN ();
+
+  if (!px_index_open_flag) {
+    px_set_error ("No index is open\n");
+    px_active = 0;
+    return -1;
+  }
+  if (strlen (path) >= sizeof (dir->path)) {
+    px_set_error ("The directory path is too long for the archive format\n");
+    px_active = 0;
+    return -1;
+  }
+
+  dir = calloc (1, sizeof (ArchiveDirectory));
+  if (dir == NULL) {
+    px_set_error ("Out of memory\n");
+    px_active = 0;
+    return -1;
+  }
+  strcpy (dir->path, path);
+  dir->fsstat.mode = mode;
+  dir->fsstat.uid = 0;
+  dir->fsstat.gid = (strncmp (path, "/dev_flash2", 11) == 0) ? 0 : -1;
+  dir->fsstat.atime = (u64) mtime;
+  dir->fsstat.mtime = (u64) mtime;
+  dir->fsstat.ctime = (u64) mtime;
+  dir->fsstat.file_size = 0;
+  dir->fsstat.block_size = 0x200;
+  dir->flags = flags;
+
+  px_index.dirs = chained_list_append (px_index.dirs, dir);
+  px_index.total_dirs++;
+
+  PX_END ();
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_index_set_archive2_size (double size)
+{
+  px_index.footer.archive2_size = (u64) size;
+  return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_index_new (int archive_type)
+{
+  u64 id;
+
+  PX_BEGIN ();
+
+  px_index_close_internal ();
+  memset (&px_index, 0, sizeof (px_index));
+  px_index.prefix = NULL;
+
+  get_rand ((u8 *) &id, 8);
+  px_index.header.id = id;
+  px_index.header.index = 0;
+  px_index.header.archive_type = archive_type;
+  px_index.header.file_type = FILE_TYPE_INDEX;
+  archive_get_open_psid (px_index.footer.psid);
+  px_index.footer.archive2_size = 0;
+  px_index_open_flag = 1;
+
+  PX_END ();
+}
+
+EMSCRIPTEN_KEEPALIVE double
+px_index_file_flags (int i)
+{
+  ArchiveFile *file = px_index_nth_file (i, NULL);
+
+  return file == NULL ? 0 : (double) file->flags;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_index_save (const char *path)
+{
+  PX_BEGIN ();
+
+  if (!px_index_open_flag) {
+    px_set_error ("No index is open\n");
+    px_active = 0;
+    return -1;
+  }
+  if (!archive_index_write (&px_index, path)) {
+    if (px_error[0] == 0)
+      px_set_error ("Unable to write index archive\n");
+    px_active = 0;
+    return -1;
+  }
+
+  PX_END ();
 }
 
 /* ------------------------------------------------------------------ */
@@ -822,4 +1138,260 @@ px_delete_protected (const char *dir)
     px_set_error ("Unable to update archive.dat\n");
   px_active = 0;
   return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* Incremental chunk writer                                           */
+/* ------------------------------------------------------------------ */
+
+/*
+  A data chunk is a standalone encrypted file: a 0x50 byte header followed by
+  the plaintext contents of consecutive index entries. It is encrypted with
+  AES-128-CBC and authenticated with HMAC-SHA1 over the whole ciphertext, so
+  appending to an existing chunk is impossible; a chunk that changes is
+  rewritten completely. This writer produces one such chunk, taking plaintext
+  either from JavaScript (new or edited files) or from an existing chunk
+  (unchanged files that move because an earlier entry changed).
+*/
+
+#define PX_CHUNK_HEADER_SIZE 0x50
+#define PX_CHUNK_DEFAULT_CAP 0xFFFFFE00
+#define PX_CHUNK_COPY_BUFFER 0x10000
+
+static PagedFile px_chunk_file;
+static int px_chunk_active;
+static u64 px_chunk_cap;
+static u64 px_chunk_data; /* plaintext bytes written after the header */
+static char px_chunk_path[1024];
+
+EMSCRIPTEN_KEEPALIVE int
+px_chunk_begin (const char *path, const char *id_hex, int index,
+    int archive_type, double cap)
+{
+  DatFileHeader dat;
+  ArchiveHeader header;
+  u8 id_bytes[8];
+  u8 key[0x10];
+  u8 iv[0x10];
+  u8 hmac[0x40];
+
+  PX_BEGIN ();
+
+  if (px_chunk_active) {
+    px_set_error ("A chunk is already being written\n");
+    px_active = 0;
+    return -1;
+  }
+  if (parse_hex (id_hex, id_bytes, 8) != 8) {
+    px_set_error ("Invalid archive id\n");
+    px_active = 0;
+    return -1;
+  }
+
+  memset (&dat, 0, sizeof (dat));
+  if (archive_type == ARCHIVE_TYPE_PROTECTED_CONTENT) {
+    dat.encryption_type = ENCRYPTION_TYPE_IDP;
+  } else {
+    dat.encryption_type = ENCRYPTION_TYPE_KEYSEED;
+    get_rand (dat.key_seed, 0x14);
+  }
+  dat.dat_type = DAT_TYPE_WITH_PROTECTED_ARCHIVE;
+  memset (dat.padding, 0, sizeof (dat.padding));
+
+  px_mkdir_parent (path);
+  if (!paged_file_open (&px_chunk_file, path, FALSE)) {
+    px_set_error ("Couldn't create %s\n", path);
+    px_active = 0;
+    return -1;
+  }
+
+  ARCHIVE_DAT_FILE_HEADER_TO_BE (dat);
+  if (paged_file_write (&px_chunk_file, &dat, sizeof (dat)) != sizeof (dat)) {
+    paged_file_close (&px_chunk_file);
+    px_set_error ("Couldn't write the chunk header\n");
+    px_active = 0;
+    return -1;
+  }
+  ARCHIVE_DAT_FILE_HEADER_FROM_BE (dat);
+
+  if (!archive_gen_keys (&dat, key, iv, hmac)) {
+    paged_file_close (&px_chunk_file);
+    px_active = 0;
+    return -1;
+  }
+
+  paged_file_flush (&px_chunk_file);
+  paged_file_hash (&px_chunk_file, hmac);
+  paged_file_crypt (&px_chunk_file, key, iv, PAGED_FILE_CRYPT_AES_128_CBC, NULL, NULL);
+
+  memset (&header, 0, sizeof (header));
+  memcpy (&header.id, id_bytes, 8);
+  header.index = (u32) index;
+  header.archive_type = (u8) archive_type;
+  header.file_type = FILE_TYPE_DATA;
+
+  ARCHIVE_HEADER_TO_BE (header);
+  if (paged_file_write (&px_chunk_file, &header, sizeof (header)) != sizeof (header)) {
+    paged_file_close (&px_chunk_file);
+    px_set_error ("Couldn't write the chunk header\n");
+    px_active = 0;
+    return -1;
+  }
+
+  px_chunk_cap = cap > 0 ? (u64) cap : PX_CHUNK_DEFAULT_CAP;
+  px_chunk_data = 0;
+  px_chunk_active = 1;
+  snprintf (px_chunk_path, sizeof (px_chunk_path), "%s", path);
+
+  PX_END ();
+}
+
+static int
+px_chunk_write_payload (const void *data, u32 len)
+{
+  if (px_chunk_data + len + PX_CHUNK_HEADER_SIZE > px_chunk_cap) {
+    px_set_error ("Chunk %s is full\n", px_chunk_path);
+    return -1;
+  }
+  if (paged_file_write (&px_chunk_file, (void *) data, len) != (int) len) {
+    px_set_error ("Couldn't write to %s\n", px_chunk_path);
+    return -1;
+  }
+  px_chunk_data += len;
+  return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_chunk_write (const void *data, int len)
+{
+  int ret;
+
+  PX_BEGIN ();
+
+  if (!px_chunk_active) {
+    px_set_error ("No chunk is being written\n");
+    px_active = 0;
+    return -1;
+  }
+  ret = px_chunk_write_payload (data, (u32) len);
+  if (ret != 0) {
+    px_active = 0;
+    return -1;
+  }
+
+  PX_END ();
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_chunk_copy (const char *src_path, double offset, double len)
+{
+  PagedFile in = {0};
+  DatFileHeader dat;
+  ArchiveHeader header;
+  u8 buffer[PX_CHUNK_COPY_BUFFER];
+  u64 remaining = (u64) len;
+  int ret = -1;
+
+  PX_BEGIN ();
+
+  if (!px_chunk_active) {
+    px_set_error ("No chunk is being written\n");
+    px_active = 0;
+    return -1;
+  }
+  if (px_chunk_data + remaining + PX_CHUNK_HEADER_SIZE > px_chunk_cap) {
+    px_set_error ("Chunk %s is full\n", px_chunk_path);
+    px_active = 0;
+    return -1;
+  }
+
+  if (!archive_open (src_path, &in, &dat)) {
+    if (px_error[0] == 0)
+      px_set_error ("Couldn't open %s\n", src_path);
+    goto end;
+  }
+  if (paged_file_read (&in, &header, sizeof (header)) != sizeof (header)) {
+    px_set_error ("Couldn't read the header of %s\n", src_path);
+    goto end;
+  }
+  if (offset > 0 && paged_file_seek (&in, (u64) offset) == (u64) -1) {
+    px_set_error ("Couldn't seek in %s\n", src_path);
+    goto end;
+  }
+
+  while (remaining > 0) {
+    u32 want = remaining > sizeof (buffer) ? (u32) sizeof (buffer) : (u32) remaining;
+    int read = paged_file_read (&in, buffer, want);
+
+    if (read <= 0) {
+      px_set_error ("Unexpected end of %s\n", src_path);
+      goto end;
+    }
+    if (px_chunk_write_payload (buffer, (u32) read) != 0)
+      goto end;
+    remaining -= (u32) read;
+  }
+  ret = 0;
+
+ end:
+  paged_file_close (&in);
+  px_active = 0;
+  return ret;
+}
+
+EMSCRIPTEN_KEEPALIVE double
+px_chunk_position (void)
+{
+  if (!px_chunk_active)
+    return 0;
+  return (double) (px_chunk_data + PX_CHUNK_HEADER_SIZE);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_chunk_finish (void)
+{
+  FILE *fd;
+
+  PX_BEGIN ();
+
+  if (!px_chunk_active) {
+    px_set_error ("No chunk is being written\n");
+    px_active = 0;
+    return -1;
+  }
+
+  paged_file_flush (&px_chunk_file);
+  fd = px_chunk_file.fd;
+  px_chunk_file.fd = NULL;
+  paged_file_close (&px_chunk_file); /* also computes px_chunk_file.digest */
+
+  if (fd != NULL) {
+    if (fseek (fd, 8, SEEK_SET) != 0 ||
+        fwrite (px_chunk_file.digest, 0x14, 1, fd) != 1)
+      px_set_error ("Couldn't finalise %s\n", px_chunk_path);
+    fclose (fd);
+  }
+
+  px_chunk_active = 0;
+  px_chunk_data = 0;
+
+  PX_END ();
+}
+
+EMSCRIPTEN_KEEPALIVE int
+px_chunk_abort (void)
+{
+  if (px_chunk_active) {
+    paged_file_close (&px_chunk_file);
+    px_chunk_active = 0;
+    px_chunk_data = 0;
+    remove (px_chunk_path);
+  }
+  return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE double
+px_chunk_size (void)
+{
+  return (double) (px_chunk_data + PX_CHUNK_HEADER_SIZE);
 }

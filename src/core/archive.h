@@ -159,6 +159,7 @@ void chained_list_foreach (ChainedList *list, ChainedListForeachCallback cb, voi
 void chained_list_free (ChainedList *list);
 
 int archive_open (const char *path, PagedFile *file, DatFileHeader *dat_header);
+int archive_gen_keys (DatFileHeader *header, u8 *key, u8 *iv, u8 *hmac);
 int archive_decrypt (const char *path, const char *to);
 int archive_index_read (ArchiveIndex *archive_index, const char *path);
 int archive_index_write (ArchiveIndex *archive_index, const char *path);
@@ -179,5 +180,6 @@ int archive_create_backup (const char *path, const char *content, const char *pr
 int archive_delete_protected (const char *path);
 void archive_set_device_id (const u8 idps[0x10]);
 void archive_set_open_psid (const u8 psid[0x10]);
+void archive_get_open_psid (u8 psid[0x10]);
 
 #endif /* __ARCHIVE_H__ */

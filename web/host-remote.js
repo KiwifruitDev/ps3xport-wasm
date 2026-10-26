@@ -49,8 +49,11 @@ export function createRemoteHost(client) {
     stat(root, rel) {
       flushAll();
       const { n0, n1, n2 } = client.call('stat', { root, rel });
-      if (n0 === 0) return null;
-      return { isDir: n2 !== 0, size: n1 };
+      if ((n0 & 1) === 0) return null;
+      return {
+        isDir: (n0 & 2) !== 0,
+        size: (n1 >>> 0) + (n2 >>> 0) * 0x100000000,
+      };
     },
 
     readdir(root, rel) {
@@ -103,8 +106,8 @@ export function createRemoteHost(client) {
     fdSize(fd) {
       const state = stateOf(fd);
       flush(fd);
-      const { n0 } = client.call('size', { root: state.root, fd });
-      return n0;
+      const { n0, n1 } = client.call('size', { root: state.root, fd });
+      return (n0 >>> 0) + (n1 >>> 0) * 0x100000000;
     },
 
     read(fd, position, length, target) {

@@ -18,6 +18,9 @@ export class DirectoryHost {
     this.nextFd = 1;
     this.bytesMoved = 0;
     this.onProgress = null;
+    // Reported to the page so a progress dialog can show which archive chunk
+    // is currently being read or written.
+    this.activity = { reads: 0, writes: 0, readPath: '', writePath: '' };
   }
 
   report(delta) {
@@ -83,8 +86,10 @@ export class DirectoryHost {
     return file;
   }
 
+  // n0 bit 0 = exists, bit 1 = directory. A 64-bit size does not fit in the
+  // 32-bit bridge words, so it is split into an unsigned low and a high word.
   async stat(root, rel) {
-    if (rel === '') return { n0: 1, n1: 0, n2: 1 };
+    if (rel === '') return { n0: 3, n1: 0, n2: 0 };
     let dir;
     let name;
     try {
@@ -97,13 +102,13 @@ export class DirectoryHost {
       const handle = await dir.getFileHandle(name, { create: false });
       const file = await handle.getFile();
       this.files.set(`${root}\u0000${rel}`, file);
-      return { n0: 1, n1: file.size, n2: 0 };
+      return { n0: 1, n1: file.size >>> 0, n2: Math.floor(file.size / 0x100000000) };
     } catch (error) {
       if (error?.name !== 'TypeMismatchError' && error?.name !== 'NotFoundError') throw error;
     }
     try {
       await dir.getDirectoryHandle(name, { create: false });
-      return { n0: 1, n1: 0, n2: 1 };
+      return { n0: 3, n1: 0, n2: 0 };
     } catch (error) {
       if (error?.name === 'NotFoundError') return { n0: 0 };
       throw error;
@@ -211,11 +216,11 @@ export class DirectoryHost {
         ? await handle.createWritable({ keepExistingData: true })
         : await handle.createWritable();
       await writable.truncate(0);
-      this.open.set(fd, { kind: 'write', writable, position: 0, size: 0 });
+      this.open.set(fd, { kind: 'write', rel, writable, position: 0, size: 0 });
       this.files.delete(`${root}\u0000${rel}`);
     } else {
       const file = await this.getFile(root, rel);
-      this.open.set(fd, { kind: 'read', file, size: file.size });
+      this.open.set(fd, { kind: 'read', rel, file, size: file.size });
     }
     return { n0: fd, n1: 0 };
   }
@@ -228,6 +233,8 @@ export class DirectoryHost {
     const buffer = await entry.file.slice(position, end).arrayBuffer();
     data.set(new Uint8Array(buffer), 0);
     this.report(buffer.byteLength);
+    this.activity.reads += buffer.byteLength;
+    this.activity.readPath = entry.rel ?? '';
     return { n0: buffer.byteLength };
   }
 
@@ -244,6 +251,8 @@ export class DirectoryHost {
     entry.position = position + length;
     entry.size = Math.max(entry.size, position + length);
     this.report(length);
+    this.activity.writes += length;
+    this.activity.writePath = entry.rel ?? '';
     return { n0: length };
   }
 
@@ -257,7 +266,8 @@ export class DirectoryHost {
 
   fileSize(fd) {
     const entry = this.open.get(fd);
-    return { n0: entry ? entry.size : 0 };
+    const size = entry ? entry.size : 0;
+    return { n0: size >>> 0, n1: Math.floor(size / 0x100000000) };
   }
 
   async dispatch(op, args, data) {

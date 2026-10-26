@@ -258,19 +258,39 @@ export function promptDialog({
 
 /* --------------------------------------------------------------- progress */
 
+export function formatDuration(milliseconds) {
+  if (!Number.isFinite(milliseconds) || milliseconds < 0) return '—';
+  const total = Math.round(milliseconds / 1000);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
 export function progressDialog({ title, cancellable = false, onCancel } = {}) {
   const dialog = $('#progress-dialog');
   const titleEl = $('#progress-title');
   const step = $('#progress-step');
   const detail = $('#progress-detail');
   const fill = $('#progress-fill');
+  const percent = $('#progress-percent');
+  const overall = $('#progress-overall');
+  const chunkRow = $('#progress-chunk-row');
+  const chunkLabel = $('#progress-chunk-label');
+  const chunkFill = $('#progress-chunk-fill');
+  const chunkValue = $('#progress-chunk-value');
+  const timing = $('#progress-timing');
   const cancel = $('#progress-cancel');
 
   titleEl.textContent = title ?? 'Working…';
   step.textContent = '';
   detail.textContent = '';
+  overall.textContent = '';
+  percent.textContent = '0%';
   fill.style.width = '0%';
   fill.classList.add('indeterminate');
+  chunkRow.hidden = true;
   cancel.hidden = !cancellable;
 
   let cancelled = false;
@@ -289,11 +309,48 @@ export function progressDialog({ title, cancellable = false, onCancel } = {}) {
   };
   dialog.addEventListener('cancel', blockEscape);
 
+  let started = performance.now();
+  let lastTime = started;
+  let lastFraction = 0;
+  let fraction = null;
+  let rate = 0; // fraction per millisecond
+
+  const renderTiming = () => {
+    const elapsed = performance.now() - started;
+    let text = `Elapsed ${formatDuration(elapsed)}`;
+    if (fraction !== null && fraction > 0.002 && rate > 0 && fraction < 1) {
+      text += ` · ETA ${formatDuration((1 - fraction) / rate)}`;
+    }
+    timing.textContent = text;
+  };
+
+  const tick = () => {
+    const now = performance.now();
+    if (fraction !== null) {
+      const delta = fraction - lastFraction;
+      const elapsed = now - lastTime;
+      if (elapsed > 150) {
+        if (delta > 0) {
+          const sample = delta / elapsed;
+          rate = rate > 0 ? rate * 0.8 + sample * 0.2 : sample;
+        }
+        lastFraction = fraction;
+        lastTime = now;
+      }
+    }
+    renderTiming();
+  };
+
+  const timer = setInterval(tick, 250);
+  renderTiming();
   showModal(dialog);
 
   return {
     get cancelled() {
       return cancelled;
+    },
+    get fraction() {
+      return fraction;
     },
     setStep(text) {
       step.textContent = text ?? '';
@@ -301,15 +358,50 @@ export function progressDialog({ title, cancellable = false, onCancel } = {}) {
     setDetail(text) {
       detail.textContent = text ?? '';
     },
-    setFraction(value) {
+    setFraction(value, text) {
+      this.setOverall(value, text);
+    },
+    setOverall(value, text) {
       if (value === null || value === undefined || !Number.isFinite(value)) {
         fill.classList.add('indeterminate');
+        percent.textContent = '…';
+        if (text !== undefined) overall.textContent = text ?? '';
         return;
       }
+      fraction = Math.max(0, Math.min(1, value));
       fill.classList.remove('indeterminate');
-      fill.style.width = `${Math.max(0, Math.min(1, value)) * 100}%`;
+      fill.style.width = `${fraction * 100}%`;
+      percent.textContent = `${Math.floor(fraction * 100)}%`;
+      if (text !== undefined) overall.textContent = text ?? '';
+      renderTiming();
+    },
+    reset() {
+      started = performance.now();
+      lastTime = started;
+      lastFraction = 0;
+      rate = 0;
+      fraction = null;
+      renderTiming();
+    },
+    disableCancel() {
+      cancel.hidden = true;
+      cancel.disabled = true;
+    },
+    setChunk(info) {
+      if (!info) {
+        chunkRow.hidden = true;
+        return;
+      }
+      chunkRow.hidden = false;
+      chunkLabel.textContent = info.label ?? 'Chunk';
+      chunkFill.classList.toggle('indeterminate', !Number.isFinite(info.fraction));
+      chunkFill.style.width = Number.isFinite(info.fraction)
+        ? `${Math.max(0, Math.min(1, info.fraction)) * 100}%`
+        : '';
+      chunkValue.textContent = info.text ?? '';
     },
     close() {
+      clearInterval(timer);
       cancel.removeEventListener('click', cancelHandler);
       dialog.removeEventListener('cancel', blockEscape);
       cancel.hidden = true;

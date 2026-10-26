@@ -25,9 +25,12 @@ function bind() {
     indexFileSize: wrap('px_index_file_size', 'number', ['number']),
     indexFileMode: wrap('px_index_file_mode', 'number', ['number']),
     indexFileMtime: wrap('px_index_file_mtime', 'number', ['number']),
+    indexFileFlags: wrap('px_index_file_flags', 'number', ['number']),
     indexDirCount: wrap('px_index_dir_count', 'number', []),
     indexDirPath: wrap('px_index_dir_path', 'string', ['number']),
     indexDirMode: wrap('px_index_dir_mode', 'number', ['number']),
+    indexDirMtime: wrap('px_index_dir_mtime', 'number', ['number']),
+    indexDirFlags: wrap('px_index_dir_flags', 'number', ['number']),
     indexTotalFiles: wrap('px_index_total_files', 'number', []),
     indexTotalFileSizes: wrap('px_index_total_file_sizes', 'number', []),
     indexTotalDirs: wrap('px_index_total_dirs', 'number', []),
@@ -50,7 +53,38 @@ function bind() {
     deleteFile: wrap('px_delete_file', 'number', ['string', 'string']),
     deletePath: wrap('px_delete_path', 'number', ['string', 'string']),
     deleteProtected: wrap('px_delete_protected', 'number', ['string']),
+    indexNew: wrap('px_index_new', 'number', ['number']),
+    indexHasFile: wrap('px_index_has_file', 'number', ['string']),
+    indexRemoveFile: wrap('px_index_remove_file', 'number', ['string']),
+    indexRenameFile: wrap('px_index_rename_file', 'number', ['string', 'string']),
+    indexUpdateFile: wrap('px_index_update_file', 'number', ['string', 'number', 'number', 'number', 'number']),
+    indexAddFile: wrap('px_index_add_file', 'number', ['string', 'number', 'number', 'number', 'number']),
+    indexClearDirs: wrap('px_index_clear_dirs', 'number', []),
+    indexAddDir: wrap('px_index_add_dir', 'number', ['string', 'number', 'number', 'number']),
+    indexSetArchive2Size: wrap('px_index_set_archive2_size', 'number', ['number']),
+    indexSave: wrap('px_index_save', 'number', ['string']),
+    chunkBegin: wrap('px_chunk_begin', 'number', ['string', 'string', 'number', 'number', 'number']),
+    chunkWrite: wrap('px_chunk_write', 'number', ['number', 'number']),
+    chunkCopy: wrap('px_chunk_copy', 'number', ['string', 'number', 'number']),
+    chunkFinish: wrap('px_chunk_finish', 'number', []),
+    chunkAbort: wrap('px_chunk_abort', 'number', []),
+    chunkSize: wrap('px_chunk_size', 'number', []),
   };
+}
+
+let copyBuffer = 0;
+let copyBufferSize = 0;
+
+function chunkWrite({ data }) {
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+  if (bytes.length > copyBufferSize) {
+    if (copyBuffer) Module._free(copyBuffer);
+    copyBuffer = Module._malloc(bytes.length);
+    copyBufferSize = bytes.length;
+  }
+  Module.HEAPU8.set(bytes, copyBuffer);
+  check(api.chunkWrite(copyBuffer, bytes.length));
+  return { n: bytes.length };
 }
 
 function check(code) {
@@ -90,12 +124,18 @@ const commands = {
           size: api.indexFileSize(i),
           mode: api.indexFileMode(i),
           mtime: api.indexFileMtime(i),
+          flags: api.indexFileFlags(i),
         });
       }
       const dirs = [];
       const dirCount = api.indexDirCount();
       for (let i = 0; i < dirCount; i++) {
-        dirs.push({ path: api.indexDirPath(i), mode: api.indexDirMode(i) });
+        dirs.push({
+          path: api.indexDirPath(i),
+          mode: api.indexDirMode(i),
+          mtime: api.indexDirMtime(i),
+          flags: api.indexDirFlags(i),
+        });
       }
       return {
         archiveType: api.indexArchiveType(),
@@ -179,6 +219,65 @@ const commands = {
 
   setOpenPsid({ hex }) {
     check(api.setOpenPsid(hex));
+    return {};
+  },
+
+  indexBegin({ open, create }) {
+    if (create !== null && create !== undefined) check(api.indexNew(create));
+    else check(api.indexOpen(open));
+    return {
+      id: api.indexId(),
+      archiveType: api.indexArchiveType(),
+      files: api.indexFileCount(),
+      dirs: api.indexDirCount(),
+    };
+  },
+
+  indexApply({ remove = [], rename = [], update = [], add = [], dirs = null, archive2Size = null, saveTo }) {
+    for (const path of remove) check(api.indexRemoveFile(path));
+    for (const item of rename) check(api.indexRenameFile(item.from, item.to));
+    for (const item of update) {
+      check(api.indexUpdateFile(item.path, item.size, item.mode ?? 0, item.mtime ?? 0, item.flags ?? 0));
+    }
+    for (const item of add) {
+      check(api.indexAddFile(item.path, item.size, item.mode ?? 0, item.mtime ?? 0, item.flags ?? 0));
+    }
+    if (dirs) {
+      check(api.indexClearDirs());
+      for (const dir of dirs) {
+        check(api.indexAddDir(dir.path, dir.mode ?? 0, dir.mtime ?? 0, dir.flags ?? 0));
+      }
+    }
+    if (archive2Size !== null && archive2Size !== undefined) api.indexSetArchive2Size(archive2Size);
+    check(api.indexSave(saveTo));
+    return {};
+  },
+
+  indexClose() {
+    api.indexClose();
+    return {};
+  },
+
+  chunkBegin({ path, id, index, archiveType, cap }) {
+    check(api.chunkBegin(path, id, index, archiveType, cap));
+    return {};
+  },
+
+  chunkWrite,
+
+  chunkCopy({ source, offset, length }) {
+    check(api.chunkCopy(source, offset, length));
+    return {};
+  },
+
+  chunkFinish() {
+    const size = api.chunkSize();
+    check(api.chunkFinish());
+    return { size };
+  },
+
+  chunkAbort() {
+    api.chunkAbort();
     return {};
   },
 };

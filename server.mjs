@@ -24,6 +24,8 @@ const MIME = {
   '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.png': 'image/png',
   '.wasm': 'application/wasm',
   '.dat': 'application/octet-stream',
   '.bin': 'application/octet-stream',
@@ -65,6 +67,8 @@ const server = createServer((request, response) => {
     'Cross-Origin-Opener-Policy': 'same-origin',
     'Cross-Origin-Embedder-Policy': 'require-corp',
     'Cross-Origin-Resource-Policy': 'same-origin',
+    // The offline cache lives in the page's own scope.
+    'Service-Worker-Allowed': '/',
   });
   createReadStream(target).pipe(response);
 });

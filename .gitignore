@@ -5,9 +5,8 @@
 *.log
 
 # Test scratch directories
-/test/.tmp/
-/test/.tmp-bridge/
-/test/.tmp-debug/
+/test/.tmp*/
+
 
 # Local source checkout; keep the original sibling checkout out of this repo
 /vendor/ps3xport/

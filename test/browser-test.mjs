@@ -534,6 +534,78 @@ async function main() {
       assert(written.includes('file:archive.dat'), 'the archive was rebuilt from the zip');
       assert(!written.some(name => name.startsWith('directory:.ps3export')), 'temporary folders were cleaned up');
     });
+    await test('selects multiple items and shows their properties', async () => {
+      await page.click('#nav-home');
+      await page.waitForFunction(() => [...document.querySelectorAll('.crumb')].length === 1);
+      const top = await rows(page);
+      assert(top.length >= 2, 'at least two top-level entries');
+      await page.click(`.explorer-row[data-path="${top[0]}"]`);
+      await page.click(`.explorer-row[data-path="${top[1]}"]`, { modifiers: ['Control'] });
+      await menuCommand(page, 'edit', 'properties');
+      await page.waitForSelector('#modal-dialog[open]');
+      await page.waitForFunction(() => document.querySelector('#modal-body')?.textContent.includes('Total size'));
+      const text = await page.textContent('#modal-body');
+      assert(text.includes('Files'), 'properties list the file count');
+      assert(text.includes('Stored in'), 'properties list the archive chunks');
+      await page.click('#modal-foot button.primary');
+    });
+
+    await test('unlinks a file and writes without a dialog when Shift is held', async () => {
+      await navigateTo(page, '/extra');
+      await page.click('.explorer-row[data-path="/extra/hello.txt"]');
+      await menuCommand(page, 'edit', 'delete-unlink');
+      await page.waitForFunction(() => !document.querySelector('.explorer-row[data-path="/extra/hello.txt"]'));
+      await logHas(page, 'Unlinked /extra/hello.txt');
+
+      await page.keyboard.down('Shift');
+      await page.click('#write-button');
+      await page.keyboard.up('Shift');
+      await logHas(page, 'Write confirmation skipped with Shift');
+      await logHasTimes(page, 'Reloading the new backup finished', 3);
+      await page.waitForFunction(() => document.querySelector('#app-status')?.textContent === 'Ready', null, { timeout: 120000 });
+      await navigateTo(page, '/extra');
+      const names = await rows(page);
+      assert(!names.includes('/extra/hello.txt'), 'the unlinked file is gone');
+    });
+
+    await test('shows unlinked data and compacts it', async () => {
+      await menuCommand(page, 'view', 'show-details');
+      await page.waitForSelector('#modal-dialog[open]');
+      await page.waitForFunction(() => document.querySelector('#modal-body')?.textContent.includes('Unlinked'));
+      await page.click('#modal-foot button.primary');
+
+      await menuCommand(page, 'view', 'compact');
+      await page.waitForFunction(() => document.querySelector('#modal-title')?.textContent === 'Compact unlinked data');
+      await page.click('#modal-foot button.danger');
+      await page.waitForFunction(() => document.querySelector('#modal-title')?.textContent === 'Write to device');
+      const planText = await page.textContent('#modal-body');
+      assert(planText.includes('Chunks written'), 'the plan lists the chunks to write');
+      assert(planText.includes('Estimated time'), 'the plan shows an estimate');
+      await page.click('#modal-foot button.danger');
+      await logHasTimes(page, 'Reloading the new backup finished', 4);
+      await page.waitForFunction(() => document.querySelector('#app-status')?.textContent === 'Ready', null, { timeout: 120000 });
+
+      await menuCommand(page, 'view', 'show-details');
+      await page.waitForSelector('#modal-dialog[open]');
+      const details = await page.textContent('#modal-body');
+      assert(!details.includes('Unlinked'), 'the tombstones were compacted');
+      await page.click('#modal-foot button.primary');
+    });
+
+    await test('has an installable manifest and an offline cache', async () => {
+      const manifest = await page.evaluate(async () => (await fetch('./manifest.webmanifest')).json());
+      assertEquals(manifest.short_name, 'ps3export', 'manifest short name');
+      assert(manifest.icons.length >= 2, 'manifest has icons');
+      const registered = await page.evaluate(async () => {
+        if (!('serviceWorker' in navigator)) return false;
+        const registration = await navigator.serviceWorker.getRegistration();
+        return Boolean(registration);
+      });
+      assert(registered, 'service worker is registered');
+      const canonical = await page.getAttribute('link[rel="canonical"]', 'href');
+      assertEquals(canonical, 'https://kiwifruitdev.com/tools/ps3export', 'canonical url');
+    });
+
   } finally {
     if (process.env.PXFS_DEBUG) {
       console.log((await page.textContent('#log').catch(() => ''))?.trim());

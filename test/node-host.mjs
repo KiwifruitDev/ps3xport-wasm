@@ -106,7 +106,9 @@ export class NodeHost {
     switch (op) {
       case 'stat': {
         const info = this.stat(args.root, args.rel);
-        return info ? { n0: 1, n1: info.size, n2: info.isDir ? 1 : 0 } : { n0: 0 };
+        return info
+          ? { n0: 1 | (info.isDir ? 2 : 0), n1: info.size >>> 0, n2: Math.floor(info.size / 0x100000000) }
+          : { n0: 0 };
       }      case 'readdir': {
         const text = new TextEncoder().encode(JSON.stringify(this.readdir(args.root, args.rel)));
         data.set(text, 0);
@@ -128,7 +130,10 @@ export class NodeHost {
         return { n0: args.length };
       }
       case 'close': this.close(args.fd); return {};
-      case 'size': return { n0: this.fdSize(args.fd) };
+      case 'size': {
+        const size = this.fdSize(args.fd);
+        return { n0: size >>> 0, n1: Math.floor(size / 0x100000000) };
+      }
       default: throw new Error(`unknown fs op ${op}`);
     }
   }

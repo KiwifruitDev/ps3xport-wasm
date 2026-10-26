@@ -42,9 +42,9 @@ backup as an editable file browser.
 | `usb` | `DirectoryHost` | the backup folder the user opened (or a replacement source) |
 | `zip` | `MemoryHost` | entries of an imported zip file |
 | `scratch` | `MemoryHost` | single-file extracts that are handed back to the page as a Blob |
-| `stage` | `DirectoryHost` | hidden staging folder inside the target device folder |
-| `out` | `DirectoryHost` | hidden output folder for a freshly built archive |
+| `out` | `DirectoryHost` | hidden folder for the chunks and index being produced |
 | `content` | `DirectoryHost` | content folder for *Create backup from folder* |
+| `extract` | `DirectoryHost` | test-only destination for full extractions |
 
 The bridge protocol routes `stat`/`readdir`/`mkdir`/… by `args.root`. `read`,
 `write`, `close` and `size` only carry a file descriptor, so `host-remote.js`
@@ -115,25 +115,57 @@ small index files take that path.
 
 ## Writing back to the device
 
-`Write` is a full rebuild, in this order:
+Archives have no per-file offsets. `archive_find_file()` walks the index and
+advances through the data chunks using the entry sizes and the actual chunk
+sizes on disk, so a file's position is implied by everything before it. Each
+chunk is AES-CBC encrypted and HMAC-SHA1 authenticated as a single file, which
+means a chunk cannot be appended to: any change to a chunk rewrites it
+completely.
 
-1. create `.ps3export-stage-<stamp>` and `.ps3export-out-<stamp>` in the target
-   folder and mount them as `stage` and `out`;
-2. extract the current archive(s) into `stage` (`px_extract_all`);
-3. apply the working copy: write in-memory blobs, copy folder-backed files,
-   write zip entries, and re-extract renamed archive entries under their new
-   path;
-4. prune anything in `stage` that the working copy no longer lists;
-5. remount `stage` so the worker sees a fresh directory tree (files were written
-   through raw handles) and call `px_create_backup(out, stage)`;
-6. verify that `archive.dat` was produced, delete the old `archive*.dat`, copy
-   the new files in, and remove both temporary folders;
-7. reload the index into a clean working copy.
+`web/layout.js` reproduces the core's position walk (`layoutArchive`) and turns
+the working copy into a plan that rewrites as little as possible:
 
-Because the rebuild happens in a temporary folder first, a failure never leaves
-the device with a half-written archive. Copy-protected content is only part of
-the rebuild when advanced mode loaded it; the confirmation dialog warns when it
-will be dropped.
+| Change | Plan |
+| --- | --- |
+| nothing | `none` — no write at all |
+| rename | index entries only |
+| unlink | index entry replaced by a hidden tombstone, layout untouched |
+| add | rewrite the last chunk and/or append new chunks |
+| replace (same size) | rewrite only the chunks holding the file |
+| erase / resize | rewrite from the first affected file's chunk to the end |
+| full rebuild (write to another folder) | rewrite every chunk |
+
+The append position follows `archive_find_file()` exactly: if the last file
+ends at a chunk boundary the core expects the next file at offset `0x50` of a
+new chunk, otherwise it expects it right after the last one. This is why appending
+usually does not touch any existing chunk (the PS3's own last chunk ends exactly
+at the end of the last file), and why the planner never pads a chunk.
+
+`web/writer.js` executes a plan. For every chunk it calls the new C API:
+
+```text
+px_chunk_begin(path, archive_id, index, archive_type, cap)
+px_chunk_write(pointer, length)          new/edited bytes from a Blob
+px_chunk_copy(path, offset, length)      unchanged bytes spliced from an old chunk
+px_chunk_finish()                        flush, patch the HMAC at offset 8
+```
+
+Unchanged files therefore never pass through JavaScript. The index itself is
+edited in place in the wasm core (`px_index_remove_file`,
+`px_index_rename_file`, `px_index_update_file`, `px_index_add_file`, directory
+table rebuild) and saved with the existing `archive_index_write`.
+
+A chunk whose file name does not exist in the destination is written straight
+to its final name. Chunks that replace an existing file are produced in
+`.ps3export-out-<stamp>` first, together with the new index, so an interrupted
+generation leaves the old archive intact. The plan dialog shows the affected
+chunks and their files and an ETA. On success the staged chunks replace the old
+ones, the index is written last, chunks that became empty are removed and the
+temporary folder is deleted. A `.ps3export-journal-<stamp>.json` marker exists
+only while a commit is in progress.
+
+Copy-protected content is only part of a plan when advanced mode loaded
+`archive2.dat`; otherwise those files and chunks are left completely untouched.
 
 ## Zip support
 
@@ -182,5 +214,24 @@ retry.
 
 Choosing a different folder for the same root re-mounts the PXFS in the worker.
 Without that, Emscripten's cached directory nodes would still point at the
-previous folder. The write-back flow remounts `stage` for the same reason after
-writing files through raw handles.
+previous folder. The write flow mounts a fresh hidden `out` folder for every
+write for the same reason.
+
+## Progress reporting
+
+The page never learns how far the core is from the core itself. Instead the
+main-thread host counts bytes read and written by the bridge
+(`DirectoryHost.activity`), and `createProgress` samples that counter while a
+blocking RPC runs. Chunk generation and index writes are therefore measured
+directly, while the commit phase (page-to-page copies) advances the counter from
+its own `FileSystemWritableFileStream` writes. The dialog shows an overall bar,
+a bar for the current chunk, the elapsed time and an ETA derived from an
+exponential moving average of the fraction rate. The learned throughput is kept
+in `localStorage` and used for the estimate in the plan dialog.
+
+## Offline app
+
+`web/sw.js` pre-caches every static asset under a versioned cache name and
+serves it cache-first; navigations fall back to `index.html`. The manifest and
+icons make the page installable. The service worker only handles the app shell:
+archive data is accessed exclusively through the File System Access API.

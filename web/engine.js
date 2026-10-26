@@ -94,7 +94,7 @@ export class Engine {
 
   async setRoot(name, handle) {
     await this.start();
-    const needsWrite = name === 'usb' || name === 'stage' || name === 'out' || name === 'backup';
+    const needsWrite = name === 'usb' || name === 'stage' || name === 'out' || name === 'backup' || name === 'device';
     if (needsWrite && typeof handle.requestPermission === 'function') {
       const status = await handle.queryPermission({ mode: 'readwrite' });
       if (status !== 'granted') {
@@ -121,19 +121,24 @@ export class Engine {
     });
   }
 
-  rpc(cmd, args = {}) {
+  rpc(cmd, args = {}, transfer = []) {
     const id = this.nextRequestId++;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
-      this.worker.postMessage({ type: 'rpc', id, cmd, args });
+      this.worker.postMessage({ type: 'rpc', id, cmd, args }, transfer);
     });
   }
 
   resetProgress() {
     this.host.bytesMoved = 0;
+    this.host.activity = { reads: 0, writes: 0, readPath: '', writePath: '' };
   }
 
   get bytesMoved() {
     return this.host.bytesMoved;
+  }
+
+  get activity() {
+    return this.host.activity;
   }
 }
