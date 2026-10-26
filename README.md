@@ -177,7 +177,9 @@ tail (one chunk for an append, more when erasing early data).
 The page is a static site with no backend. `sw.js` caches the HTML, scripts and
 the WebAssembly binary, so after the first visit it works offline and browsers
 can install it as an app (*View -> Install app*, or the address bar's install
-button). The  files can be run from any static host that sends the COOP/COEP headers used by `server.mjs`.
+button). The canonical address is
+<https://kiwifruitdev.com/apps/ps3xport-wasm>; the same files also run from any
+static host that sends the COOP/COEP headers used by `server.mjs`.
 
 ## Safety notes
 
