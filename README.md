@@ -45,7 +45,7 @@ Normal backups need no console-specific keys: `archive.dat` and
 
 Copy-protected content (`archive2.dat`, `archive2_*.dat`) is encrypted with the
 console Device ID. It is **ignored by default**. Enable *Advanced mode* in
-*View → Settings* and paste your Device ID / IDP to include those files. When
+*View -> Settings* and paste your Device ID / IDP to include those files. When
 advanced mode is off, writing a backup that contains copy-protected content
 drops it - the confirmation dialog says so.
 
@@ -95,10 +95,10 @@ instead of the UI.
 3. **Edit** a text file by double-clicking it. `Ctrl+S` in the editor saves to
    the working copy - not to disk. Binary files and files above 8 MiB can be
    downloaded instead of edited.
-4. **Add content** with *Edit → New file / New folder / Import files / Import
+4. **Add content** with *Edit -> New file / New folder / Import files / Import
    folder*. Imported files are kept in memory until you write.
 5. **Download** the working copy as a zip from the toolbar button or
-   *File → Download as zip*.
+   *File -> Download as zip*.
 6. **Write** (`Ctrl+S` outside the editor) to update the archive in the folder
    you opened (or a folder you pick). The plan dialog shows which chunks and
    files change, with an estimated duration.
@@ -152,7 +152,7 @@ content/
     └── ...
 ```
 
-New backups created with *File → Create backup from folder…* are written into a
+New backups created with *File -> Create backup from folder…* are written into a
 `YYYYMMDDHHmm` subfolder of the output folder, matching the PS3's own naming.
 
 ## Memory and large backups
@@ -176,10 +176,8 @@ tail (one chunk for an append, more when erasing early data).
 
 The page is a static site with no backend. `sw.js` caches the HTML, scripts and
 the WebAssembly binary, so after the first visit it works offline and browsers
-can install it as an app (*View → Install app*, or the address bar's install
-button). The canonical address is
-<https://kiwifruitdev.com/tools/ps3xport>; the same files also run from any
-static host that sends the COOP/COEP headers used by `server.mjs`.
+can install it as an app (*View -> Install app*, or the address bar's install
+button). The  files can be run from any static host that sends the COOP/COEP headers used by `server.mjs`.
 
 ## Safety notes
 

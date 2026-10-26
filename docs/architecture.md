@@ -12,7 +12,7 @@ backup as an editable file browser.
   Browser UI (web/app.js, web/ui.js)
         │  browsing, editing, zip, write-back, dialogs
         ▼
-  Working copy (web/vfs.js)  ← in-memory tree of paths + content sources
+  Working copy (web/vfs.js)  <- in-memory tree of paths + content sources
         │  also exposed as a PXFS host for the wasm core
         ▼
   Web worker (web/worker.js)
@@ -20,17 +20,17 @@ backup as an editable file browser.
         │  2. mounts roots into the Emscripten VFS
         │  3. calls the flat C API in src/wasm/api.c
         ▼
-  ps3xport core (src/core/*.c)  ← unmodified upstream logic
+  ps3xport core (src/core/*.c)  <- unmodified upstream logic
         │  fopen / fread / fwrite / fseek / stat / opendir / rename
         ▼
-  PXFS driver (web/pxfs.js)     ← Emscripten filesystem implementation
+  PXFS driver (web/pxfs.js)     <- Emscripten filesystem implementation
         │  synchronous host interface
         ▼
   SharedArrayBuffer bridge (web/sync-bridge.js, web/host-remote.js)
         │  Atomics.wait + postMessage
         ▼
   Main-thread host router (web/engine.js)
-        │  real folders → host-directory.js   memory trees → vfs.js
+        │  real folders -> host-directory.js   memory trees -> vfs.js
         ▼
   User's USB drive / folder, or zip data
 ```

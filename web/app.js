@@ -867,7 +867,7 @@ async function loadArchiveSource({
     if (!state.settings.advanced) {
       log('archive2.dat holds copy-protected content; it is ignored while advanced mode is off.', 'warn');
     } else if (!state.settings.deviceId) {
-      log('archive2.dat needs a Device ID. Add one in Settings → Advanced mode to include it.', 'warn');
+      log('archive2.dat needs a Device ID. Add one in Settings -> Advanced mode to include it.', 'warn');
     } else {
       progress.setStep('Reading archive2.dat');
       await applyCredentials();
@@ -1478,7 +1478,7 @@ async function showWritePlanDialog({ plans, target, sameFolder, estimate, direct
   const modified = plans.flatMap(plan => plan.changes.modified);
   const erased = plans.flatMap(plan => plan.changes.erased);
   const unlinked = plans.flatMap(plan => plan.changes.unlinked);
-  const renamed = plans.flatMap(plan => plan.changes.renamed.map(change => ({ path: `${change.from} → ${change.to}`, size: change.size })));
+  const renamed = plans.flatMap(plan => plan.changes.renamed.map(change => ({ path: `${change.from} -> ${change.to}`, size: change.size })));
 
   body.append(listSection('Added files', added));
   body.append(listSection('Modified files', modified, {
@@ -2596,7 +2596,7 @@ async function showShortcuts() {
     ['Delete', 'Delete the selection (choose Unlink or Erase)'],
     ['Shift+Delete', 'Delete without a dialog, using the saved mode'],
     ['F5', 'Reload from the folder'],
-    ['Alt+← / Alt+→', 'Go back / forward'],
+    ['Alt+<- / Alt+->', 'Go back / forward'],
     ['Backspace / Home', 'Up one level / backup root'],
     ['Enter', 'Open the selection'],
     ['Shift + any action', 'Skip its confirmation dialog (Write, delete, compact, …)'],
@@ -2619,7 +2619,7 @@ async function showAbout() {
     title: 'About ps3xport',
     body: `<p class="muted">A local PS3 backup editor. The <a href="https://github.com/kakaroto/ps3xport" target="_blank" rel="noreferrer">ps3xport</a> C core (GPLv3) runs as WebAssembly inside this page, so backups are read and written without uploading anything.</p>
       <p class="muted">Writes are incremental: renaming only rewrites the index, adding files only appends to the last chunk (or starts a new one), and only a delete or a size change rewrites the chunks after the affected file.</p>
-      <p class="muted">Canonical address: <a href="https://kiwifruitdev.com/tools/ps3xport" target="_blank" rel="noreferrer">kiwifruitdev.com/tools/ps3xport</a>. The page works offline once loaded and can be installed as an app.</p>
+      <p class="muted">The page works offline once loaded and can be installed as an app.</p>
       <p class="muted">Web panel by <a href="https://github.com/KiwifruitDev" target="_blank" rel="noreferrer">KiwifruitDev</a> © 2026, MIT licensed.</p>`,
     actions: [{ label: 'Close', value: null, kind: 'primary' }],
   });
@@ -3110,7 +3110,7 @@ window.addEventListener('beforeinstallprompt', event => {
   event.preventDefault();
   state.installPrompt = event;
   updateControls();
-  log('This page can be installed as an app (View → Install app).', 'dim');
+  log('This page can be installed as an app (View -> Install app).', 'dim');
 });
 
 window.addEventListener('appinstalled', () => {

@@ -602,8 +602,6 @@ async function main() {
         return Boolean(registration);
       });
       assert(registered, 'service worker is registered');
-      const canonical = await page.getAttribute('link[rel="canonical"]', 'href');
-      assertEquals(canonical, 'https://kiwifruitdev.com/tools/ps3xport', 'canonical url');
     });
 
   } finally {
