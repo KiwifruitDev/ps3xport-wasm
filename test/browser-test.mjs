@@ -72,7 +72,7 @@ const pattern = (length, modulus) => {
 const fixtures = {
   'dev_hdd0/home/00000001/savedata/GAME1/SAVE.DAT': pattern(700 * 1024, 251),
   'dev_hdd0/game/TEST/USRDIR/EBOOT.BIN': pattern(2500 * 1024, 253),
-  'dev_flash2/etc/note.txt': Buffer.from('ps3export wasm browser test\n'),
+  'dev_flash2/etc/note.txt': Buffer.from('ps3xport wasm browser test\n'),
 };
 
 const expectedHashes = Object.fromEntries(Object.entries(fixtures).map(([name, data]) => [
@@ -147,7 +147,7 @@ async function navigateTo(page, target) {
   await page.press('#path-input', 'Enter');
   await page.waitForFunction(
     wanted => [...document.querySelectorAll('.crumb')].some(node => node.textContent.trim() === wanted),
-    target.split('/').filter(Boolean).pop() ?? 'ps3export',
+    target.split('/').filter(Boolean).pop() ?? 'ps3xport',
   );
 }
 
@@ -161,7 +161,7 @@ async function waitForDownload(page) {
     page.waitForEvent('download', { timeout: 120000 }),
     page.click('#download-button'),
   ]);
-  const target = path.join(os.tmpdir(), `ps3export-test-${Date.now()}.zip`);
+  const target = path.join(os.tmpdir(), `ps3xport-test-${Date.now()}.zip`);
   await download.saveAs(target);
   return target;
 }
@@ -322,7 +322,7 @@ async function main() {
       await navigateTo(page, '/dev_flash2/etc');
       await openEditorFor(page, '/dev_flash2/etc/note.txt');
       const original = await page.inputValue('#editor-text');
-      assert(original.startsWith('ps3export wasm browser test'), 'editor shows the original text');
+      assert(original.startsWith('ps3xport wasm browser test'), 'editor shows the original text');
       await page.fill('#editor-text', editedNote);
       await page.click('#editor-save');
       await page.waitForSelector('#editor-dialog', { state: 'hidden' });
@@ -407,7 +407,7 @@ async function main() {
         return names;
       }, backupName);
       assert(leftovers.some(name => name === 'file:archive.dat'), 'archive.dat was rebuilt');
-      assert(!leftovers.some(name => name.startsWith('directory:.ps3export')), 'temporary folders were cleaned up');
+      assert(!leftovers.some(name => name.startsWith('directory:.ps3xport')), 'temporary folders were cleaned up');
       assert(!leftovers.some(name => name.endsWith('.bak')), 'no .bak files are left behind');
     });
 
@@ -475,7 +475,7 @@ async function main() {
 
     assert(consoleErrors.length === 0, `no console errors: ${consoleErrors.join(' | ')}`);
     await test('writes a backup that came from a zip file', async () => {
-      const zipPath = path.join(os.tmpdir(), `ps3export-backup-${Date.now()}.zip`);
+      const zipPath = path.join(os.tmpdir(), `ps3xport-backup-${Date.now()}.zip`);
       const base64 = await page.evaluate(async name => {
         const { buildZip } = await import('./zip.js');
         const root = await navigator.storage.getDirectory();
@@ -532,7 +532,7 @@ async function main() {
         return names;
       });
       assert(written.includes('file:archive.dat'), 'the archive was rebuilt from the zip');
-      assert(!written.some(name => name.startsWith('directory:.ps3export')), 'temporary folders were cleaned up');
+      assert(!written.some(name => name.startsWith('directory:.ps3xport')), 'temporary folders were cleaned up');
     });
     await test('selects multiple items and shows their properties', async () => {
       await page.click('#nav-home');
@@ -594,7 +594,7 @@ async function main() {
 
     await test('has an installable manifest and an offline cache', async () => {
       const manifest = await page.evaluate(async () => (await fetch('./manifest.webmanifest')).json());
-      assertEquals(manifest.short_name, 'ps3export', 'manifest short name');
+      assertEquals(manifest.short_name, 'ps3xport', 'manifest short name');
       assert(manifest.icons.length >= 2, 'manifest has icons');
       const registered = await page.evaluate(async () => {
         if (!('serviceWorker' in navigator)) return false;
@@ -603,7 +603,7 @@ async function main() {
       });
       assert(registered, 'service worker is registered');
       const canonical = await page.getAttribute('link[rel="canonical"]', 'href');
-      assertEquals(canonical, 'https://kiwifruitdev.com/tools/ps3export', 'canonical url');
+      assertEquals(canonical, 'https://kiwifruitdev.com/tools/ps3xport', 'canonical url');
     });
 
   } finally {

@@ -1,4 +1,4 @@
-// Small static file server for ps3export-wasm.
+// Small static file server for ps3xport-wasm.
 //
 // The app needs a cross-origin isolated context (SharedArrayBuffer) and must be
 // served over http://localhost or https. This server sends the required COOP
@@ -75,7 +75,7 @@ const server = createServer((request, response) => {
 
 server.listen(port, '127.0.0.1', () => {
   const url = `http://localhost:${port}/`;
-  console.log(`ps3export-wasm running at ${url}`);
+  console.log(`ps3xport-wasm running at ${url}`);
   console.log(`serving ${webRoot}`);
   if (shouldOpen && process.platform === 'win32') {
     exec(`start "" "${url}"`);

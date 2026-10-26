@@ -1,4 +1,4 @@
-# ps3export-wasm
+# ps3xport-wasm
 
 `ps3xport` compiled to WebAssembly: a local file manager and editor for PS3
 Backup Utility backups, running entirely in Chrome or Edge. Nothing is uploaded;
@@ -128,7 +128,7 @@ from its Blob in 4 MiB slices. Nothing is extracted.
 
 Chunks that do not exist yet are written straight to their final name, so the
 common append case needs no temporary space at all. Only chunks that replace an
-existing file are produced in a hidden `.ps3export-out-*` folder first; it is
+existing file are produced in a hidden `.ps3xport-out-*` folder first; it is
 removed after the commit.
 
 Every chunk except the last one is exactly `0xFFFFFE00` bytes (4 GiB − 512); a
@@ -178,7 +178,7 @@ The page is a static site with no backend. `sw.js` caches the HTML, scripts and
 the WebAssembly binary, so after the first visit it works offline and browsers
 can install it as an app (*View → Install app*, or the address bar's install
 button). The canonical address is
-<https://kiwifruitdev.com/tools/ps3export>; the same files also run from any
+<https://kiwifruitdev.com/tools/ps3xport>; the same files also run from any
 static host that sends the COOP/COEP headers used by `server.mjs`.
 
 ## Safety notes

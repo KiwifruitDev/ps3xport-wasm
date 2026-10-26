@@ -1,11 +1,11 @@
-// Offline cache for ps3export.
+// Offline cache for ps3xport.
 //
 // Everything the page needs is static, so the service worker makes the app
 // work without a network connection and allows browsers to install it as an
 // app. Archive data never goes through the service worker: it is read and
 // written through the File System Access API.
 
-const VERSION = 'ps3export-v2';
+const VERSION = 'ps3xport-v2';
 const ASSETS = [
   './',
   './index.html',

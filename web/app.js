@@ -1,4 +1,4 @@
-// ps3export web panel.
+// ps3xport web panel.
 //
 // The page keeps a working copy of the backup contents in memory (a Vfs tree)
 // and only streams bytes when a file is opened, zipped or written back. The
@@ -19,8 +19,8 @@ import * as ui from './ui.js';
 const MAX_ROWS = 1500;
 const EDIT_LIMIT = 8 * 1024 * 1024;
 const COPY_CHUNK = 4 * 1024 * 1024;
-const SETTINGS_KEY = 'ps3export.settings.v2';
-const SCRATCH_ROOT = 'ps3export-scratch';
+const SETTINGS_KEY = 'ps3xport.settings.v2';
+const SCRATCH_ROOT = 'ps3xport-scratch';
 
 const $ = selector => document.querySelector(selector);
 
@@ -971,7 +971,7 @@ async function loadBackupFolder(handle, { progress = noProgress, replace = false
   const entries = await listFolderNames(handle);
   const hasArchive = entries.some(entry => entry.name === 'archive.dat' && entry.kind === 'file');
 
-  const journal = entries.find(entry => entry.name.startsWith('.ps3export-journal-'));
+  const journal = entries.find(entry => entry.name.startsWith('.ps3xport-journal-'));
   if (journal) {
     log(`A previous write into "${handle.name}" was interrupted (${journal.name}). The archive may be incomplete; writing again will repair the chunks and index it touches.`, 'warn');
     ui.toast('A previous write was interrupted. Check the archive before using it on a console.', {
@@ -983,7 +983,7 @@ async function loadBackupFolder(handle, { progress = noProgress, replace = false
     // A common mistake is picking PS3/EXPORT instead of PS3/EXPORT/<timestamp>.
     const candidates = [];
     for (const entry of entries) {
-      if (entry.kind !== 'directory' || entry.name.startsWith('.ps3export')) continue;
+      if (entry.kind !== 'directory' || entry.name.startsWith('.ps3xport')) continue;
       const subEntries = await listFolderNames(await handle.getDirectoryHandle(entry.name));
       if (subEntries.some(item => item.name === 'archive.dat' && item.kind === 'file')) {
         candidates.push(await handle.getDirectoryHandle(entry.name));
@@ -1102,7 +1102,7 @@ async function openFolder() {
   }
   let handle;
   try {
-    handle = await window.showDirectoryPicker({ id: 'ps3export-backup', mode: 'readwrite' });
+    handle = await window.showDirectoryPicker({ id: 'ps3xport-backup', mode: 'readwrite' });
   } catch (error) {
     if (error?.name !== 'AbortError') ui.toast(error.message ?? String(error), { kind: 'err', title: 'Could not open folder' });
     return;
@@ -1536,7 +1536,7 @@ async function writeToDevice({ compact = false } = {}) {
   let target = state.writeTarget;
   if (!target) {
     try {
-      const handle = await window.showDirectoryPicker({ id: 'ps3export-write', mode: 'readwrite' });
+      const handle = await window.showDirectoryPicker({ id: 'ps3xport-write', mode: 'readwrite' });
       target = { handle, name: handle.name };
       state.writeTarget = target;
     } catch (error) {
@@ -1590,8 +1590,8 @@ async function writeToDevice({ compact = false } = {}) {
     : null;
   const sourceBase = `/px/${state.source.root}`;
   const stamp = stamps();
-  const outDirName = `.ps3export-out-${stamp}`;
-  const journalName = `.ps3export-journal-${stamp}.json`;
+  const outDirName = `.ps3xport-out-${stamp}`;
+  const journalName = `.ps3xport-journal-${stamp}.json`;
   const startedAt = performance.now();
   let committing = false;
 
@@ -1817,7 +1817,7 @@ async function writeToDevice({ compact = false } = {}) {
 async function downloadZip() {
   if (!state.source) return;
   const total = state.stats.bytes || 1;
-  const stem = sanitizeName((state.source.label || 'ps3export').replace(/\.zip$/i, '')) || 'ps3export';
+  const stem = sanitizeName((state.source.label || 'ps3xport').replace(/\.zip$/i, '')) || 'ps3xport';
   const name = `${stem}-${stamps()}.zip`;
 
   await run('Preparing zip', async progress => {
@@ -2616,10 +2616,10 @@ async function showShortcuts() {
 
 async function showAbout() {
   await ui.openDialog({
-    title: 'About ps3export',
+    title: 'About ps3xport',
     body: `<p class="muted">A local PS3 backup editor. The <a href="https://github.com/kakaroto/ps3xport" target="_blank" rel="noreferrer">ps3xport</a> C core (GPLv3) runs as WebAssembly inside this page, so backups are read and written without uploading anything.</p>
       <p class="muted">Writes are incremental: renaming only rewrites the index, adding files only appends to the last chunk (or starts a new one), and only a delete or a size change rewrites the chunks after the affected file.</p>
-      <p class="muted">Canonical address: <a href="https://kiwifruitdev.com/tools/ps3export" target="_blank" rel="noreferrer">kiwifruitdev.com/tools/ps3export</a>. The page works offline once loaded and can be installed as an app.</p>
+      <p class="muted">Canonical address: <a href="https://kiwifruitdev.com/tools/ps3xport" target="_blank" rel="noreferrer">kiwifruitdev.com/tools/ps3xport</a>. The page works offline once loaded and can be installed as an app.</p>
       <p class="muted">Web panel by <a href="https://github.com/KiwifruitDev" target="_blank" rel="noreferrer">KiwifruitDev</a> © 2026, MIT licensed.</p>`,
     actions: [{ label: 'Close', value: null, kind: 'primary' }],
   });
@@ -2686,7 +2686,7 @@ async function createBackupFromFolder() {
     onOpen: () => {
       body.querySelector('#cb-content').addEventListener('click', async () => {
         try {
-          picked.content = await window.showDirectoryPicker({ id: 'ps3export-content', mode: 'read' });
+          picked.content = await window.showDirectoryPicker({ id: 'ps3xport-content', mode: 'read' });
           body.querySelector('#cb-content-name').textContent = picked.content.name;
         } catch (error) {
           if (error?.name !== 'AbortError') ui.toast(error.message ?? String(error), { kind: 'err' });
@@ -2694,7 +2694,7 @@ async function createBackupFromFolder() {
       });
       body.querySelector('#cb-output').addEventListener('click', async () => {
         try {
-          picked.output = await window.showDirectoryPicker({ id: 'ps3export-output', mode: 'readwrite' });
+          picked.output = await window.showDirectoryPicker({ id: 'ps3xport-output', mode: 'readwrite' });
           body.querySelector('#cb-output-name').textContent = picked.output.name;
         } catch (error) {
           if (error?.name !== 'AbortError') ui.toast(error.message ?? String(error), { kind: 'err' });
@@ -2739,7 +2739,7 @@ async function replaceContents(kind) {
 
   let handle;
   try {
-    handle = await window.showDirectoryPicker({ id: 'ps3export-content', mode: 'readwrite' });
+    handle = await window.showDirectoryPicker({ id: 'ps3xport-content', mode: 'readwrite' });
   } catch (error) {
     if (error?.name !== 'AbortError') ui.toast(error.message ?? String(error), { kind: 'err' });
     return;
@@ -2785,7 +2785,7 @@ const commands = {
     }
     state.installPrompt.prompt();
     const choice = await state.installPrompt.userChoice.catch(() => null);
-    if (choice?.outcome === 'accepted') ui.toast('ps3export will now open like an app.', { kind: 'ok', title: 'Installed' });
+    if (choice?.outcome === 'accepted') ui.toast('ps3xport will now open like an app.', { kind: 'ok', title: 'Installed' });
     state.installPrompt = null;
     updateControls();
   },

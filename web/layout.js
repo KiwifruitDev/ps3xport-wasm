@@ -22,7 +22,7 @@
 
 export const CHUNK_HEADER = 0x50;
 export const CHUNK_CAP = 0xFFFFFE00;
-export const TOMBSTONE_PREFIX = '/dev_hdd0/.ps3export-unlinked/';
+export const TOMBSTONE_PREFIX = '/dev_hdd0/.ps3xport-unlinked/';
 
 export function chunkName(prefix, index) {
   return `${prefix}_${String(index).padStart(2, '0')}.dat`;

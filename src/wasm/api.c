@@ -1,5 +1,5 @@
 /*
-  ps3export-wasm C API.
+  ps3xport-wasm C API.
 
   This file is the only new C code in the port: it exposes a small, flat,
   JavaScript-friendly surface over the upstream ps3xport core (see
@@ -8,7 +8,7 @@
   die()/exit() failure path into a return value plus px_last_error().
 
   Copyright 2015 Kakaroto (upstream ps3xport)
-  Copyright 2026 ps3export-wasm contributors
+  Copyright 2026 ps3xport-wasm contributors
 
   Licensed under the terms of the GNU General Public License version 3.
 */
@@ -90,7 +90,7 @@ px_die (const char *format, ...)
     longjmp (px_jmp, 1);
 
   /* No API call is in flight: nothing sensible left to do. */
-  fprintf (stderr, "ps3export-wasm: %s\n", px_error);
+  fprintf (stderr, "ps3xport-wasm: %s\n", px_error);
   __builtin_trap ();
 }
 

@@ -157,11 +157,11 @@ table rebuild) and saved with the existing `archive_index_write`.
 
 A chunk whose file name does not exist in the destination is written straight
 to its final name. Chunks that replace an existing file are produced in
-`.ps3export-out-<stamp>` first, together with the new index, so an interrupted
+`.ps3xport-out-<stamp>` first, together with the new index, so an interrupted
 generation leaves the old archive intact. The plan dialog shows the affected
 chunks and their files and an ETA. On success the staged chunks replace the old
 ones, the index is written last, chunks that became empty are removed and the
-temporary folder is deleted. A `.ps3export-journal-<stamp>.json` marker exists
+temporary folder is deleted. A `.ps3xport-journal-<stamp>.json` marker exists
 only while a commit is in progress.
 
 Copy-protected content is only part of a plan when advanced mode loaded

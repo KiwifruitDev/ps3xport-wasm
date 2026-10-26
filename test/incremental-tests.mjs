@@ -115,7 +115,7 @@ function extractedHashes() {
 
 function archiveTree(index, blobs) {
   return index.files
-    .filter(file => !file.path.startsWith('/dev_hdd0/.ps3export-unlinked/'))
+    .filter(file => !file.path.startsWith('/dev_hdd0/.ps3xport-unlinked/'))
     .map(file => ({
       path: file.path,
       size: file.size,
@@ -395,7 +395,7 @@ async function main() {
     commit(plan);
     index = await rpc('listIndex', { path: '/px/backup/archive.dat' });
     assert(!index.files.some(file => file.path === target), 'unlinked entry is not listed');
-    assert(index.files.some(file => file.path.startsWith('/dev_hdd0/.ps3export-unlinked/')), 'tombstone keeps the layout');
+    assert(index.files.some(file => file.path.startsWith('/dev_hdd0/.ps3xport-unlinked/')), 'tombstone keeps the layout');
     expected.delete(target);
     await extractAll(rpc);
     const hashes = extractedHashes();
@@ -415,7 +415,7 @@ async function main() {
     await closeIndex(engine);
     commit(plan);
     index = await rpc('listIndex', { path: '/px/backup/archive.dat' });
-    assert(!index.files.some(file => file.path.startsWith('/dev_hdd0/.ps3export-unlinked/')), 'tombstones are gone');
+    assert(!index.files.some(file => file.path.startsWith('/dev_hdd0/.ps3xport-unlinked/')), 'tombstones are gone');
     await extractAll(rpc);
     const hashes = extractedHashes();
     for (const [file, hash] of expected) assertEquals(hashes.get(file.slice(1)), hash, `content of ${file}`);
