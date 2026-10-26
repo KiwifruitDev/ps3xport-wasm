@@ -2619,7 +2619,7 @@ async function showAbout() {
     title: 'About ps3xport',
     body: `<p class="muted">A local PS3 backup editor. The <a href="https://github.com/kakaroto/ps3xport" target="_blank" rel="noreferrer">ps3xport</a> C core (GPLv3) runs as WebAssembly inside this page, so backups are read and written without uploading anything.</p>
       <p class="muted">Writes are incremental: renaming only rewrites the index, adding files only appends to the last chunk (or starts a new one), and only a delete or a size change rewrites the chunks after the affected file.</p>
-      <p class="muted">Canonical address: <a href="https://kiwifruitdev.com/apps/ps3xport-wasm" target="_blank" rel="noreferrer">kiwifruitdev.com/tools/ps3xport</a>. The page works offline once loaded and can be installed as an app.</p>
+      <p class="muted">The page works offline once loaded and can be installed as an app.</p>
       <p class="muted">Web panel by <a href="https://github.com/KiwifruitDev" target="_blank" rel="noreferrer">KiwifruitDev</a> © 2026, MIT licensed.</p>`,
     actions: [{ label: 'Close', value: null, kind: 'primary' }],
   });
