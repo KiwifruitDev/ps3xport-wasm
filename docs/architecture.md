@@ -127,7 +127,7 @@ the working copy into a plan that rewrites as little as possible:
 
 | Change | Plan |
 | --- | --- |
-| nothing | `none` — no write at all |
+| nothing | `none` - no write at all |
 | rename | index entries only |
 | unlink | index entry replaced by a hidden tombstone, layout untouched |
 | add | rewrite the last chunk and/or append new chunks |

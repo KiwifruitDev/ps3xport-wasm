@@ -5,7 +5,7 @@
 const $ = selector => document.querySelector(selector);
 
 export function formatBytes(value) {
-  if (!Number.isFinite(value) || value < 0) return '—';
+  if (!Number.isFinite(value) || value < 0) return '-';
   if (value < 1024) return `${value} B`;
   const units = ['KiB', 'MiB', 'GiB', 'TiB'];
   let size = value / 1024;
@@ -18,9 +18,9 @@ export function formatBytes(value) {
 }
 
 export function formatDate(value) {
-  if (!value) return '—';
+  if (!value) return '-';
   const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString(undefined, {
     year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit',
   });
@@ -259,7 +259,7 @@ export function promptDialog({
 /* --------------------------------------------------------------- progress */
 
 export function formatDuration(milliseconds) {
-  if (!Number.isFinite(milliseconds) || milliseconds < 0) return '—';
+  if (!Number.isFinite(milliseconds) || milliseconds < 0) return '-';
   const total = Math.round(milliseconds / 1000);
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);

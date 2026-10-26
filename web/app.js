@@ -403,7 +403,7 @@ function render() {
     const note = document.createElement('div');
     note.className = 'explorer-row';
     note.style.cursor = 'default';
-    note.innerHTML = `<span class="name"><span class="label muted">Showing the first ${shown.length.toLocaleString()} of ${entries.length.toLocaleString()} entries — open a subfolder or use the path bar.</span></span>`;
+    note.innerHTML = `<span class="name"><span class="label muted">Showing the first ${shown.length.toLocaleString()} of ${entries.length.toLocaleString()} entries - open a subfolder or use the path bar.</span></span>`;
     el.browser.append(note);
   }
 
@@ -459,7 +459,7 @@ function buildRow(entry) {
 
   const size = document.createElement('span');
   size.className = 'size';
-  size.textContent = entry.type === 'file' ? bytes(entry.size) : '—';
+  size.textContent = entry.type === 'file' ? bytes(entry.size) : '-';
 
   const mode = document.createElement('span');
   mode.className = 'mode';
@@ -467,7 +467,7 @@ function buildRow(entry) {
 
   const date = document.createElement('span');
   date.className = 'date';
-  date.textContent = entry.mtime ? ui.formatDate(entry.mtime) : '—';
+  date.textContent = entry.mtime ? ui.formatDate(entry.mtime) : '-';
 
   row.append(name, size, mode, date);
   return row;
@@ -484,8 +484,8 @@ function renderSummary() {
   }
   const rows = [
     ['Source', `${state.source.kind === 'zip' ? 'Zip' : 'Folder'} · ${state.source.label}`],
-    ['Backup ID', state.details?.id ?? '—', true],
-    ['Layout', state.details?.layout ?? '—'],
+    ['Backup ID', state.details?.id ?? '-', true],
+    ['Layout', state.details?.layout ?? '-'],
     ['Files', `${state.stats.files.toLocaleString()} (${bytes(state.stats.bytes)})`],
     ['Folders', state.stats.dirs.toLocaleString()],
   ];
@@ -773,7 +773,7 @@ function updateEditorMeta() {
   el.editorMeta.textContent = `${lines.toLocaleString()} lines · ${value.length.toLocaleString()} characters`;
   el.editorHint.textContent = value === state.editorOriginal
     ? 'Ctrl+S saves to the working copy'
-    : 'Unsaved changes — Ctrl+S to apply';
+    : 'Unsaved changes - Ctrl+S to apply';
 }
 
 function saveEditor() {
@@ -1436,7 +1436,7 @@ function describePlan(plan) {
       ? 'Append to a new chunk'
       : `Append to chunk ${String(plan.startSegment).padStart(2, '0')}`;
     case 'inplace': return 'Rewrite the affected chunks';
-    case 'tail': return `Rewrite chunks ${String(plan.startSegment).padStart(2, '0')}–${String(Math.max(plan.startSegment, plan.layout.chunkCount - 1)).padStart(2, '0')}`;
+    case 'tail': return `Rewrite chunks ${String(plan.startSegment).padStart(2, '0')}-${String(Math.max(plan.startSegment, plan.layout.chunkCount - 1)).padStart(2, '0')}`;
     case 'full': return 'Full rebuild';
     default: return plan.mode;
   }
@@ -2198,7 +2198,7 @@ async function showFileProperties(path) {
   add('Name', path.split('/').pop());
   add('Path', path, true);
   add('Type', node.type === 'dir' ? 'Folder' : 'File');
-  add('Size', node.type === 'file' ? `${node.size.toLocaleString()} bytes (${bytes(node.size)})` : '—');
+  add('Size', node.type === 'file' ? `${node.size.toLocaleString()} bytes (${bytes(node.size)})` : '-');
   add('Mode', `0${(node.mode ?? 0).toString(8)}`);
   add('Modified', ui.formatDate(node.mtime));
   add('Status', state.removed.has(path)
@@ -2415,9 +2415,9 @@ async function showDetails() {
   if (!state.source) return;
   const body = element('div', 'properties');
   const rows = [
-    ['Source', `${state.source.kind === 'zip' ? 'Zip file' : 'Folder'} — ${state.source.label}`],
-    ['Backup ID', state.details?.id ?? '—', true],
-    ['Layout', state.details?.layout ?? '—'],
+    ['Source', `${state.source.kind === 'zip' ? 'Zip file' : 'Folder'} - ${state.source.label}`],
+    ['Backup ID', state.details?.id ?? '-', true],
+    ['Layout', state.details?.layout ?? '-'],
     ['Archives', state.details?.archives.map(a => `${a.prefix}.dat`).join(', ') || 'none'],
     ['Files', state.stats.files.toLocaleString()],
     ['Folders', state.stats.dirs.toLocaleString()],
@@ -2518,8 +2518,8 @@ async function showSettings() {
     <div class="field">
       <label for="set-delete">Delete without a dialog (Shift + Delete)</label>
       <select id="set-delete">
-        <option value="erase">Erase — reclaim the space, rewrite affected chunks</option>
-        <option value="unlink">Unlink — instant, keep the bytes in the archive</option>
+        <option value="erase">Erase - reclaim the space, rewrite affected chunks</option>
+        <option value="unlink">Unlink - instant, keep the bytes in the archive</option>
       </select>
       <span class="hint">Holding Shift while deleting (or writing) skips the confirmation and uses this choice.</span>
     </div>
@@ -3101,7 +3101,7 @@ async function boot() {
 
   if ('serviceWorker' in navigator && window.isSecureContext) {
     navigator.serviceWorker.register(new URL('./sw.js', import.meta.url), { scope: './' })
-      .then(() => log('Offline cache ready — the app can be installed and used without a network.', 'dim'))
+      .then(() => log('Offline cache ready - the app can be installed and used without a network.', 'dim'))
       .catch(error => log(`Offline cache unavailable: ${error.message}`, 'warn'));
   }
 }

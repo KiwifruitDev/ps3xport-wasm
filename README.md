@@ -10,7 +10,7 @@ there is no backend, only a static file server.
   into a working copy you can browse.
 - **Browse it like a file manager**: folders, `..`, a breadcrumb path bar and
   back / forward / up / home navigation.
-- **Create, import and edit files** — including a built-in text editor for
+- **Create, import and edit files** - including a built-in text editor for
   files up to 8 MiB.
 - **Create folders, rename and delete** anything in the working copy.
 - **Multi-selection** with `Ctrl`+click, `Shift`+click, `Ctrl+A`, plus a
@@ -47,7 +47,17 @@ Copy-protected content (`archive2.dat`, `archive2_*.dat`) is encrypted with the
 console Device ID. It is **ignored by default**. Enable *Advanced mode* in
 *View → Settings* and paste your Device ID / IDP to include those files. When
 advanced mode is off, writing a backup that contains copy-protected content
-drops it — the confirmation dialog says so.
+drops it - the confirmation dialog says so.
+
+## Arkham: Revived PS3 patcher
+
+[`arkham-patcher/`](./arkham-patcher) builds the browser patcher served at
+<https://kiwifruitdev.com/arkhamrevived/ps3-tutorial/>. It downloads the
+official 1.06 title update, patches its COALESCED files, and either merges them
+into a Backup Utility archive (reusing this project's WebAssembly core and
+incremental writer) or offers a zip for CFW/HEN consoles. Its build artifacts
+live under `kiwifruitdev.com/public/arkhamrevived/ps3-tutorial/app/`; see
+[arkham-patcher/README.md](./arkham-patcher/README.md).
 
 ## Requirements
 
@@ -83,7 +93,7 @@ instead of the UI.
    buttons. `Ctrl+L` (or the pencil button) turns the path bar into an editable
    path.
 3. **Edit** a text file by double-clicking it. `Ctrl+S` in the editor saves to
-   the working copy — not to disk. Binary files and files above 8 MiB can be
+   the working copy - not to disk. Binary files and files above 8 MiB can be
    downloaded instead of edited.
 4. **Add content** with *Edit → New file / New folder / Import files / Import
    folder*. Imported files are kept in memory until you write.
@@ -205,6 +215,7 @@ web/            static app: UI, worker, filesystem driver, wasm output
 scripts/        build-wasm.mjs (Emscripten build)
 test/           Node + Chrome end-to-end tests
 server.mjs      static server with COOP/COEP headers
+arkham-patcher/ the Arkham: Revived PS3 patcher page (separate build)
 ```
 
 ## Building the WebAssembly module
@@ -242,7 +253,7 @@ dump the activity log when a test fails.
 
 - Web panel (the UI in `web/`) © 2026
   [KiwifruitDev](https://github.com/KiwifruitDev), released under the MIT
-  licence — see [web/LICENSE](./web/LICENSE).
+  licence - see [web/LICENSE](./web/LICENSE).
 - The ported `ps3xport` core (GPLv3), the WebAssembly glue and the filesystem
   driver come from [kakaroto/ps3xport](https://github.com/kakaroto/ps3xport) and
-  remain under the GPLv3 — see `COPYING`.
+  remain under the GPLv3 - see `COPYING`.

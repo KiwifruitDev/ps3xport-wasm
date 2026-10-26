@@ -1,5 +1,5 @@
 {
-  "name": "ps3export — PS3 backup editor",
+  "name": "ps3export - PS3 backup editor",
   "short_name": "ps3export",
   "description": "Browse, edit and rebuild PS3 Backup Utility archives locally. Incremental writes, chunk-aware storage, no uploads.",
   "id": "./",

@@ -184,6 +184,24 @@ export function planArchive({
       return;
     }
 
+    // An explicit unlink wins over an entry at the same path in the working
+    // copy: the new file is appended as an addition and the old bytes stay
+    // behind a tombstone. This is what the Arkham patcher uses to replace a
+    // title update without rewriting the archive tail.
+    if (unlink.has(entry.path)) {
+      let tombstone = tombstonePath(order);
+      for (let suffix = 1; byPath.has(tombstone); suffix++) tombstone = `${TOMBSTONE_PREFIX}${order}-${suffix}`;
+      final.push({
+        kind: 'tombstone', path: entry.path, finalPath: tombstone, size: entry.size,
+        old: entry, data: { kind: 'old', entry }, order,
+      });
+      changes.unlinked.push({
+        path: entry.path, size: entry.size, segments: entry.spans.map(span => span.segment),
+      });
+      indexOps.renames.push({ from: entry.path, to: tombstone });
+      return;
+    }
+
     const direct = treeByPath.get(entry.path);
     if (direct) {
       covered.add(direct.path);
@@ -262,20 +280,6 @@ export function planArchive({
         structuralOrder = order;
         structuralEntry = entry;
       }
-      return;
-    }
-
-    if (unlink.has(entry.path)) {
-      let tombstone = tombstonePath(order);
-      for (let suffix = 1; byPath.has(tombstone); suffix++) tombstone = `${TOMBSTONE_PREFIX}${order}-${suffix}`;
-      final.push({
-        kind: 'tombstone', path: entry.path, finalPath: tombstone, size: entry.size,
-        old: entry, data: { kind: 'old', entry }, order,
-      });
-      changes.unlinked.push({
-        path: entry.path, size: entry.size, segments: entry.spans.map(span => span.segment),
-      });
-      indexOps.renames.push({ from: entry.path, to: tombstone });
       return;
     }
 
