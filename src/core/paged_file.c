@@ -357,6 +357,7 @@ int
 paged_file_getline (PagedFile *f, char **line, int *line_len)
 {
   int pos = 0;
+  int read_any = FALSE;
 
   if (!f->reader)
     return -1;
@@ -373,12 +374,15 @@ paged_file_getline (PagedFile *f, char **line, int *line_len)
     if (paged_file_read (f, (*line) + pos, 1) != 1) {
       (*line)[pos] = 0;
       break;
-    } else if ((*line)[pos] == '\n') {
+    }
+    read_any = TRUE;
+    if ((*line)[pos] == '\n') {
       (*line)[pos + 1] = 0;
       break;
     }
     pos++;
   }
 
-  return pos == 0 ? -1 : pos;
+  // An empty line ("\n") returns 0, not -1: only a read past the end is EOF.
+  return read_any ? pos : -1;
 }
