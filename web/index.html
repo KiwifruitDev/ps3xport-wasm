@@ -46,15 +46,15 @@
       <div class="menu-group">
         <button type="button" class="menu-button" data-menu="file" aria-expanded="false">File</button>
         <div class="menu-panel" data-panel="file" hidden>
-          <button type="button" data-cmd="open"><svg><use href="#i-open"/></svg><span>Open backup folder…</span><kbd>Ctrl+O</kbd></button>
-          <button type="button" data-cmd="open-zip"><svg><use href="#i-folder"/></svg><span>Open zip file…</span></button>
-          <button type="button" data-cmd="create-backup"><svg><use href="#i-new-file"/></svg><span>Create backup from folder…</span></button>
+          <button type="button" data-cmd="open"><svg><use href="#i-open"/></svg><span>Open backup folder...</span><kbd>Ctrl+O</kbd></button>
+          <button type="button" data-cmd="open-zip"><svg><use href="#i-folder"/></svg><span>Open zip file...</span></button>
+          <button type="button" data-cmd="create-backup"><svg><use href="#i-new-file"/></svg><span>Create backup from folder...</span></button>
           <div class="menu-rule"></div>
-          <button type="button" data-cmd="replace-zip"><svg><use href="#i-upload"/></svg><span>Replace contents with zip…</span></button>
-          <button type="button" data-cmd="replace-folder"><svg><use href="#i-open"/></svg><span>Replace contents with folder…</span></button>
+          <button type="button" data-cmd="replace-zip"><svg><use href="#i-upload"/></svg><span>Replace contents with zip...</span></button>
+          <button type="button" data-cmd="replace-folder"><svg><use href="#i-open"/></svg><span>Replace contents with folder...</span></button>
           <div class="menu-rule"></div>
-          <button type="button" data-cmd="download-zip"><svg><use href="#i-download"/></svg><span>Download as zip…</span></button>
-          <button type="button" data-cmd="write"><svg><use href="#i-write"/></svg><span>Write to device…</span><kbd>Ctrl+S</kbd></button>
+          <button type="button" data-cmd="download-zip"><svg><use href="#i-download"/></svg><span>Download as zip...</span></button>
+          <button type="button" data-cmd="write"><svg><use href="#i-write"/></svg><span>Write to device...</span><kbd>Ctrl+S</kbd></button>
           <div class="menu-rule"></div>
           <button type="button" data-cmd="close"><svg><use href="#i-trash"/></svg><span>Close backup</span></button>
         </div>
@@ -62,16 +62,16 @@
       <div class="menu-group">
         <button type="button" class="menu-button" data-menu="edit" aria-expanded="false">Edit</button>
         <div class="menu-panel" data-panel="edit" hidden>
-          <button type="button" data-cmd="new-file"><svg><use href="#i-new-file"/></svg><span>New file…</span><kbd>Ctrl+N</kbd></button>
-          <button type="button" data-cmd="new-folder"><svg><use href="#i-new-folder"/></svg><span>New folder…</span></button>
+          <button type="button" data-cmd="new-file"><svg><use href="#i-new-file"/></svg><span>New file...</span><kbd>Ctrl+N</kbd></button>
+          <button type="button" data-cmd="new-folder"><svg><use href="#i-new-folder"/></svg><span>New folder...</span></button>
           <div class="menu-rule"></div>
-          <button type="button" data-cmd="import-files"><svg><use href="#i-upload"/></svg><span>Import files…</span></button>
-          <button type="button" data-cmd="import-folder"><svg><use href="#i-open"/></svg><span>Import folder…</span></button>
+          <button type="button" data-cmd="import-files"><svg><use href="#i-upload"/></svg><span>Import files...</span></button>
+          <button type="button" data-cmd="import-folder"><svg><use href="#i-open"/></svg><span>Import folder...</span></button>
           <div class="menu-rule"></div>
-          <button type="button" data-cmd="rename"><svg><use href="#i-pencil"/></svg><span>Rename…</span><kbd>F2</kbd></button>
-          <button type="button" data-cmd="properties"><svg><use href="#i-info"/></svg><span>Properties…</span><kbd>F4</kbd></button>
+          <button type="button" data-cmd="rename"><svg><use href="#i-pencil"/></svg><span>Rename...</span><kbd>F2</kbd></button>
+          <button type="button" data-cmd="properties"><svg><use href="#i-info"/></svg><span>Properties...</span><kbd>F4</kbd></button>
           <div class="menu-rule"></div>
-          <button type="button" data-cmd="delete"><svg><use href="#i-trash"/></svg><span>Delete…</span><kbd>Del</kbd></button>
+          <button type="button" data-cmd="delete"><svg><use href="#i-trash"/></svg><span>Delete...</span><kbd>Del</kbd></button>
           <button type="button" data-cmd="delete-unlink"><svg><use href="#i-trash"/></svg><span>Unlink (keep bytes)</span></button>
           <button type="button" data-cmd="delete-erase"><svg><use href="#i-trash"/></svg><span>Erase (rewrite chunks)</span></button>
         </div>
@@ -81,10 +81,10 @@
         <div class="menu-panel" data-panel="view" hidden>
           <button type="button" data-cmd="refresh"><svg><use href="#i-reload"/></svg><span>Reload from folder</span><kbd>F5</kbd></button>
           <button type="button" data-cmd="show-details"><svg><use href="#i-info"/></svg><span>Backup details</span></button>
-          <button type="button" data-cmd="compact"><svg><use href="#i-trash"/></svg><span>Compact unlinked data…</span></button>
+          <button type="button" data-cmd="compact"><svg><use href="#i-trash"/></svg><span>Compact unlinked data...</span></button>
           <div class="menu-rule"></div>
           <button type="button" data-cmd="install"><svg><use href="#i-download"/></svg><span>Install app</span></button>
-          <button type="button" data-cmd="settings"><svg><use href="#i-settings"/></svg><span>Settings…</span></button>
+          <button type="button" data-cmd="settings"><svg><use href="#i-settings"/></svg><span>Settings...</span></button>
         </div>
       </div>
       <div class="menu-group">
@@ -97,7 +97,7 @@
         </div>
       </div>
     </nav>
-    <span class="status" id="app-status">Starting…</span>
+    <span class="status" id="app-status">Starting...</span>
   </header>
 
   <div class="toolbar">
@@ -138,8 +138,8 @@
         <h2>No backup open</h2>
         <p class="muted">Open the folder that holds <code>archive.dat</code> (for example <code>PS3\EXPORT\202610241324</code>) or drop a zip here. The archive is read into a working copy you can browse and edit.</p>
         <div class="row centered">
-          <button type="button" id="empty-open">Open backup folder…</button>
-          <button type="button" id="empty-zip" class="secondary">Open zip file…</button>
+          <button type="button" id="empty-open">Open backup folder...</button>
+          <button type="button" id="empty-zip" class="secondary">Open zip file...</button>
         </div>
       </div>
       <div class="drop-overlay" id="drop-overlay" hidden>Drop a zip to open it</div>
@@ -167,7 +167,7 @@
     <p>
       Web panel by
       <a href="https://github.com/KiwifruitDev" target="_blank" rel="noreferrer">KiwifruitDev</a>
-      © 2026, released under the <a href="./LICENSE" target="_blank" rel="noreferrer">MIT License</a>.
+      (c) 2026, released under the <a href="./LICENSE" target="_blank" rel="noreferrer">MIT License</a>.
       Built on <a href="https://github.com/kakaroto/ps3xport" target="_blank" rel="noreferrer">ps3xport</a>
       (GPLv3) compiled to WebAssembly. Everything runs locally - no uploads, no telemetry.
     </p>
@@ -209,7 +209,7 @@
     <div class="dialog-form">
       <header class="dialog-head">
         <div>
-          <h2 id="progress-title">Working…</h2>
+          <h2 id="progress-title">Working...</h2>
           <p class="dialog-sub" id="progress-step"></p>
         </div>
         <span class="pill" id="progress-percent">0%</span>

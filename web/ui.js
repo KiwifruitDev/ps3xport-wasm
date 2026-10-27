@@ -283,7 +283,7 @@ export function progressDialog({ title, cancellable = false, onCancel } = {}) {
   const timing = $('#progress-timing');
   const cancel = $('#progress-cancel');
 
-  titleEl.textContent = title ?? 'Working…';
+  titleEl.textContent = title ?? 'Working...';
   step.textContent = '';
   detail.textContent = '';
   overall.textContent = '';
@@ -297,7 +297,7 @@ export function progressDialog({ title, cancellable = false, onCancel } = {}) {
   const cancelHandler = () => {
     cancelled = true;
     cancel.disabled = true;
-    cancel.textContent = 'Cancelling…';
+    cancel.textContent = 'Cancelling...';
     onCancel?.();
   };
   cancel.disabled = false;
@@ -364,7 +364,7 @@ export function progressDialog({ title, cancellable = false, onCancel } = {}) {
     setOverall(value, text) {
       if (value === null || value === undefined || !Number.isFinite(value)) {
         fill.classList.add('indeterminate');
-        percent.textContent = '…';
+        percent.textContent = '...';
         if (text !== undefined) overall.textContent = text ?? '';
         return;
       }

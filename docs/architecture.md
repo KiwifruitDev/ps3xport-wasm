@@ -46,9 +46,9 @@ backup as an editable file browser.
 | `content` | `DirectoryHost` | content folder for *Create backup from folder* |
 | `extract` | `DirectoryHost` | test-only destination for full extractions |
 
-The bridge protocol routes `stat`/`readdir`/`mkdir`/… by `args.root`. `read`,
+The bridge protocol routes `stat`/`readdir`/`mkdir`/... by `args.root`. `read`,
 `write`, `close` and `size` only carry a file descriptor, so `host-remote.js`
-remembers the root each descriptor was opened with and forwards it; the router in
+remembers the root each descriptor was opened with and forwards it, the router in
 `engine.js` then picks the right host.
 
 ### Why the core runs unmodified
@@ -63,7 +63,7 @@ patches were needed:
 | --- | --- |
 | `src/core/paged_file.c` | `fseeko`/`ftello` so archive offsets are 64-bit (wasm32 `long` is 32-bit) |
 | `src/core/tools.h` | `die()` routes to `px_die()` so failures surface as errors instead of `exit()` |
-| `src/core/tools.c` | `get_rand()` uses `crypto.getRandomValues`; unused `zlib.h` include removed |
+| `src/core/tools.c` | `get_rand()` uses `crypto.getRandomValues`, unused `zlib.h` include removed |
 | `src/core/archive.c` | `populate_dirlist()` stats entries when `PX_STAT_DIRENT` is defined (no reliable `d_type`) |
 
 ### Why a worker plus SharedArrayBuffer
@@ -71,7 +71,7 @@ patches were needed:
 The C core is a blocking program: `fread` must return data before the next
 instruction runs. The File System Access API is asynchronous and only available
 on the main thread. The bridge solves this by running the wasm in a worker and
-sending each filesystem call to the page, where it is awaited and completed; the
+sending each filesystem call to the page, where it is awaited and completed, the
 worker parks on `Atomics.wait` until the answer arrives.
 
 Consequences:
@@ -92,7 +92,7 @@ megabytes instead of to the core's 4 KiB page size.
 
 ## The working copy
 
-`web/vfs.js` holds the tree the user browses. Nodes are directories or files;
+`web/vfs.js` holds the tree the user browses. Nodes are directories or files,
 files carry a *content source* and are materialised on demand:
 
 | Source | Meaning | Materialised by |
@@ -109,7 +109,7 @@ megabytes of metadata. Each `archive` source keeps its original path
 archive lookup does not.
 
 The same object is exposed as a `MemoryHost`, so the core can mount it (used for
-zip input and scratch space). Sequential writes are collected as Blob parts;
+zip input and scratch space). Sequential writes are collected as Blob parts,
 random-access writes fall back to a growable buffer, which is fine because only
 small index files take that path.
 
@@ -165,7 +165,7 @@ temporary folder is deleted. A `.ps3xport-journal-<stamp>.json` marker exists
 only while a commit is in progress.
 
 Copy-protected content is only part of a plan when advanced mode loaded
-`archive2.dat`; otherwise those files and chunks are left completely untouched.
+`archive2.dat`, otherwise those files and chunks are left completely untouched.
 
 ## Zip support
 
@@ -195,10 +195,10 @@ is enabled and a Device ID is configured. The Device ID is stored in
 
 ## Safety model
 
-1. Reads go through `File.slice(...).arrayBuffer()`; nothing is buffered whole.
-2. Writes go through `FileSystemWritableFileStream`; a folder is only writable
+1. Reads go through `File.slice(...).arrayBuffer()`, nothing is buffered whole.
+2. Writes go through `FileSystemWritableFileStream`, a folder is only writable
    after the user grants it in the picker.
-3. Edits stay in memory until `Write`; the rebuild happens in temporary folders.
+3. Edits stay in memory until `Write`, the rebuild happens in temporary folders.
 4. Deleting or renaming only affects the working copy until `Write`.
 5. Content over 8 MiB (or non-UTF-8 content) is never loaded into the editor.
 
@@ -232,6 +232,6 @@ in `localStorage` and used for the estimate in the plan dialog.
 ## Offline app
 
 `web/sw.js` pre-caches every static asset under a versioned cache name and
-serves it cache-first; navigations fall back to `index.html`. The manifest and
+serves it cache-first, navigations fall back to `index.html`. The manifest and
 icons make the page installable. The service worker only handles the app shell:
 archive data is accessed exclusively through the File System Access API.

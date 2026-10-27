@@ -1,8 +1,11 @@
 # ps3xport-wasm
 
 `ps3xport` compiled to WebAssembly: a local file manager and editor for PS3
-Backup Utility backups, running entirely in Chrome or Edge. Nothing is uploaded;
-there is no backend, only a static file server.
+Backup Utility backups, running entirely in Chrome or Chromium browsers like Edge. No backend required!
+
+> [!NOTE]
+> Significant portions of this codebase were developed with AI assistance using
+> [DeepSeek](https://www.deepseek.com/) and [GitHub Copilot](https://github.com/features/copilot).
 
 ## What it does
 
@@ -51,13 +54,13 @@ drops it - the confirmation dialog says so.
 
 ## Arkham: Revived PS3 patcher
 
-[`arkham-patcher/`](./arkham-patcher) builds the browser patcher served at
+[`arkham-patcher/`](https://github.com/KiwifruitDev/arkham-patcher) builds the browser patcher served at
 <https://kiwifruitdev.com/arkhamrevived/ps3-tutorial/>. It downloads the
 official 1.06 title update, patches its COALESCED files, and either merges them
 into a Backup Utility archive (reusing this project's WebAssembly core and
 incremental writer) or offers a zip for CFW/HEN consoles. Its build artifacts
-live under `kiwifruitdev.com/public/arkhamrevived/ps3-tutorial/app/`; see
-[arkham-patcher/README.md](./arkham-patcher/README.md).
+live under `kiwifruitdev.com/public/arkhamrevived/ps3-tutorial/app/` (see
+[arkham-patcher](https://github.com/KiwifruitDev/arkham-patcher)).
 
 ## Requirements
 
@@ -105,7 +108,7 @@ instead of the UI.
 
 ### Working copy semantics
 
-Opening a backup reads only the index into memory; file contents stay in the
+Opening a backup reads only the index into memory, file contents stay in the
 original archive and are streamed when you open, zip or write them. Edits,
 imports and new files live in memory as Blobs until you write.
 
@@ -128,10 +131,10 @@ from its Blob in 4 MiB slices. Nothing is extracted.
 
 Chunks that do not exist yet are written straight to their final name, so the
 common append case needs no temporary space at all. Only chunks that replace an
-existing file are produced in a hidden `.ps3xport-out-*` folder first; it is
-removed after the commit.
+existing file are produced in a hidden `.ps3xport-out-*` folder first and then
+it is removed after the commit.
 
-Every chunk except the last one is exactly `0xFFFFFE00` bytes (4 GiB − 512); a
+Every chunk except the last one is exactly `0xFFFFFE00` bytes (4 GiB − 512), a
 chunk that becomes empty is removed. Files larger than the free space of a chunk
 span a chunk boundary, which the file properties dialog shows explicitly.
 
@@ -152,14 +155,14 @@ content/
     └── ...
 ```
 
-New backups created with *File -> Create backup from folder…* are written into a
+New backups created with *File -> Create backup from folder...* are written into a
 `YYYYMMDDHHmm` subfolder of the output folder, matching the PS3's own naming.
 
 ## Memory and large backups
 
 The page never holds a whole backup in RAM:
 
-- The working copy stores metadata only; contents are referenced by their source
+- The working copy stores metadata only, contents are referenced by their source
   (archive entry, zip entry, folder file, or in-memory blob).
 - All archive reads and writes are chunked through the 8 MiB SharedArrayBuffer
   bridge, and direct folder copies use 4 MiB slices.
@@ -187,7 +190,7 @@ static host that sends the COOP/COEP headers used by `server.mjs`.
 - A write only touches `archive.dat` / `archive2.dat` and the `archive_*.dat`
   chunks that actually change. Keep a second copy of anything you cannot afford
   to lose.
-- New chunks are produced in a hidden folder first; the old chunks and index are
+- New chunks are produced in a hidden folder first, the old chunks and index are
   replaced only when every new chunk has been written successfully.
 - Copy-protected content is only included when advanced mode is on and a Device
   ID is configured. If it is off, `archive2*.dat` is left completely untouched.
@@ -250,7 +253,7 @@ dump the activity log when a test fails.
 
 ## Credits and licence
 
-- Web panel (the UI in `web/`) © 2026
+- Web panel (the UI in `web/`) (c) 2026
   [KiwifruitDev](https://github.com/KiwifruitDev), released under the MIT
   licence - see [web/LICENSE](./web/LICENSE).
 - The ported `ps3xport` core (GPLv3), the WebAssembly glue and the filesystem

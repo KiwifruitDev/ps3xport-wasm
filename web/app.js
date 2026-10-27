@@ -1335,7 +1335,7 @@ function listSection(title, entries, { note, detail } = {}) {
     list.append(line);
   }
   if (entries.length > limit) {
-    list.append(element('div', 'file-line', `… and ${(entries.length - limit).toLocaleString()} more`));
+    list.append(element('div', 'file-line', `... and ${(entries.length - limit).toLocaleString()} more`));
   }
   scroll.append(list);
   section.append(scroll);
@@ -1363,7 +1363,7 @@ function chunkSection(plans) {
       line.append(element(
         'span',
         'name muted',
-        `${files.length.toLocaleString()} file${files.length === 1 ? '' : 's'}: ${files.slice(0, 6).join(', ')}${files.length > 6 ? ', …' : ''}`,
+        `${files.length.toLocaleString()} file${files.length === 1 ? '' : 's'}: ${files.slice(0, 6).join(', ')}${files.length > 6 ? ', ...' : ''}`,
       ));
       list.append(line);
       if (files.length) {
@@ -1375,7 +1375,7 @@ function chunkSection(plans) {
         details.append(summary);
         const inner = element('div', 'file-list');
         for (const file of files.slice(0, 500)) inner.append(element('div', 'file-line', file));
-        if (files.length > 500) inner.append(element('div', 'file-line', `… and ${(files.length - 500).toLocaleString()} more`));
+        if (files.length > 500) inner.append(element('div', 'file-line', `... and ${(files.length - 500).toLocaleString()} more`));
         details.append(inner);
         list.append(details);
       }
@@ -2008,7 +2008,7 @@ async function askDeleteMode(entries, files, archived) {
   const chunks = [...impact.affected.entries()]
     .map(([prefix, first]) => {
       const count = (state.chunkSizes[prefix]?.length ?? 0) - first;
-      return `${prefix}_${String(first).padStart(2, '0')}.dat${count > 1 ? ` … ${prefix}_${String(first + count - 1).padStart(2, '0')}.dat` : ''}`;
+      return `${prefix}_${String(first).padStart(2, '0')}.dat${count > 1 ? ` ... ${prefix}_${String(first + count - 1).padStart(2, '0')}.dat` : ''}`;
     })
     .join(', ');
   const title = entries.length === 1 && entries[0].node.type === 'dir' ? 'Delete folder' : 'Delete';
@@ -2159,7 +2159,7 @@ function chunkListSection(stats) {
     line.append(element('span', 'chunk-bytes', `${bytes(bucket.bytes)} · ${bucket.files.size.toLocaleString()} file${bucket.files.size === 1 ? '' : 's'}`));
     list.append(line);
   }
-  if (buckets.length > 120) list.append(element('p', 'note', `… and ${(buckets.length - 120).toLocaleString()} more chunks`));
+  if (buckets.length > 120) list.append(element('p', 'note', `... and ${(buckets.length - 120).toLocaleString()} more chunks`));
   section.append(list);
   return section;
 }
@@ -2241,7 +2241,7 @@ async function showFileProperties(path) {
     const token = { cancelled: false };
     const scan = element('section');
     scan.append(element('h3', '', 'Contents'));
-    const scanInfo = element('p', 'note', 'Scanning the folder…');
+    const scanInfo = element('p', 'note', 'Scanning the folder...');
     scan.append(scanInfo);
     body.append(scan);
     const dialogPromise = ui.openDialog({
@@ -2254,7 +2254,7 @@ async function showFileProperties(path) {
         const stats = await collectStats([path], {
           token,
           onProgress: progress => {
-            scanInfo.textContent = `Scanning… ${progress.files.toLocaleString()} files, ${bytes(progress.bytes)}`;
+            scanInfo.textContent = `Scanning... ${progress.files.toLocaleString()} files, ${bytes(progress.bytes)}`;
           },
         });
         if (token.cancelled) return;
@@ -2270,7 +2270,7 @@ async function showFileProperties(path) {
             line.append(element('span', 'num', `${item.chunks} chunks · ${bytes(item.size)}`));
             list.append(line);
           }
-          if (stats.spanning.length > 100) list.append(element('p', 'note', `… and ${(stats.spanning.length - 100).toLocaleString()} more`));
+          if (stats.spanning.length > 100) list.append(element('p', 'note', `... and ${(stats.spanning.length - 100).toLocaleString()} more`));
           span.append(list);
           body.append(span);
         }
@@ -2309,7 +2309,7 @@ async function showProperties() {
     info.append(element('dd', mono ? 'mono' : '', value));
   };
   add(entries.length === 1 ? 'Folder' : 'Items', entries.length === 1 ? paths[0] : `${entries.length.toLocaleString()} items`, entries.length === 1);
-  const progressLine = element('p', 'note', 'Scanning…');
+  const progressLine = element('p', 'note', 'Scanning...');
   summary.append(info, progressLine);
   body.append(summary);
 
@@ -2328,7 +2328,7 @@ async function showProperties() {
       const stats = await collectStats(paths, {
         token,
         onProgress: progress => {
-          progressLine.textContent = `Scanning… ${progress.files.toLocaleString()} files, ${bytes(progress.bytes)}`;
+          progressLine.textContent = `Scanning... ${progress.files.toLocaleString()} files, ${bytes(progress.bytes)}`;
         },
       });
       if (token.cancelled) return;
@@ -2477,7 +2477,7 @@ async function showDetails() {
   const actions = [{ label: 'Close', value: null, kind: 'primary' }];
   if (Object.values(state.layouts).some(layout => layout?.entries.some(entry => isTombstone(entry.path)))) {
     actions.unshift({
-      label: 'Compact unlinked data…',
+      label: 'Compact unlinked data...',
       kind: 'secondary',
       onClick: ({ close }) => {
         close(null);
@@ -2599,7 +2599,7 @@ async function showShortcuts() {
     ['Alt+<- / Alt+->', 'Go back / forward'],
     ['Backspace / Home', 'Up one level / backup root'],
     ['Enter', 'Open the selection'],
-    ['Shift + any action', 'Skip its confirmation dialog (Write, delete, compact, …)'],
+    ['Shift + any action', 'Skip its confirmation dialog (Write, delete, compact, ...)'],
   ];
   const list = document.createElement('dl');
   list.className = 'info-list';
@@ -2620,7 +2620,7 @@ async function showAbout() {
     body: `<p class="muted">A local PS3 backup editor. The <a href="https://github.com/kakaroto/ps3xport" target="_blank" rel="noreferrer">ps3xport</a> C core (GPLv3) runs as WebAssembly inside this page, so backups are read and written without uploading anything.</p>
       <p class="muted">Writes are incremental: renaming only rewrites the index, adding files only appends to the last chunk (or starts a new one), and only a delete or a size change rewrites the chunks after the affected file.</p>
       <p class="muted">The page works offline once loaded and can be installed as an app.</p>
-      <p class="muted">Web panel by <a href="https://github.com/KiwifruitDev" target="_blank" rel="noreferrer">KiwifruitDev</a> © 2026, MIT licensed.</p>`,
+      <p class="muted">Web panel by <a href="https://github.com/KiwifruitDev" target="_blank" rel="noreferrer">KiwifruitDev</a> (c) 2026, MIT licensed.</p>`,
     actions: [{ label: 'Close', value: null, kind: 'primary' }],
   });
 }
@@ -2653,15 +2653,15 @@ async function createBackupFromFolder() {
   body.style.display = 'grid';
   body.style.gap = '.8rem';
   body.innerHTML = `
-    <p class="muted">Build a new backup from a folder that mirrors the PS3 filesystem (<code>dev_hdd0</code>, <code>dev_flash2</code>, …). The archive is written into a timestamped subfolder of the output folder.</p>
+    <p class="muted">Build a new backup from a folder that mirrors the PS3 filesystem (<code>dev_hdd0</code>, <code>dev_flash2</code>, ...). The archive is written into a timestamped subfolder of the output folder.</p>
     <div class="field">
       <label>Content folder</label>
-      <button type="button" class="secondary" id="cb-content">Choose content folder…</button>
+      <button type="button" class="secondary" id="cb-content">Choose content folder...</button>
       <span class="hint" id="cb-content-name">Not selected</span>
     </div>
     <div class="field">
       <label>Output folder</label>
-      <button type="button" class="secondary" id="cb-output">Choose output folder…</button>
+      <button type="button" class="secondary" id="cb-output">Choose output folder...</button>
       <span class="hint" id="cb-output-name">Not selected</span>
     </div>`;
 
@@ -2876,10 +2876,10 @@ function bindEvents() {
       if (!isDir) items.push({ label: 'Download', icon: 'i-download', action: () => downloadNode(single) });
       items.push({ rule: true });
     }
-    items.push({ label: paths.length > 1 ? `Properties (${paths.length})…` : 'Properties…', icon: 'i-info', action: showProperties });
-    if (single) items.push({ label: 'Rename…', icon: 'i-pencil', action: renameSelected });
+    items.push({ label: paths.length > 1 ? `Properties (${paths.length})...` : 'Properties...', icon: 'i-info', action: showProperties });
+    if (single) items.push({ label: 'Rename...', icon: 'i-pencil', action: renameSelected });
     items.push({ rule: true });
-    items.push({ label: 'Delete…', icon: 'i-trash', danger: true, action: () => deleteSelected() });
+    items.push({ label: 'Delete...', icon: 'i-trash', danger: true, action: () => deleteSelected() });
     items.push({ label: 'Unlink (keep bytes)', icon: 'i-trash', action: () => deleteSelected('unlink') });
     items.push({ label: 'Erase (rewrite chunks)', icon: 'i-trash', danger: true, action: () => deleteSelected('erase') });
     ui.showContextMenu(items, event.clientX, event.clientY);
